@@ -1,0 +1,108 @@
+#!/usr/bin/python3
+
+import tkinter as tk
+from tkinter import ttk
+from tkinter.filedialog import askopenfilename, askdirectory
+from stampper import StampBot
+import threading
+from ttkthemes import ThemedTk
+from msgs import error_msgs as err
+from msgs import log_msgs as log
+import os
+from sys import platform
+
+
+def csv_chooser_event():
+    text = csv_path_field.get()
+    selected = askopenfilename()
+    if not len(selected) == 0:
+        csv_path_field.delete(first=0, last=len(text))
+        csv_path_field.insert(0, selected)
+
+
+def run():
+    text.delete(1.0, tk.END)
+    bot.stamp_ratio = float(scale.get())
+    bot.csv_path = csv_path_field.get()
+    bot.print = _print
+    bot.print(log.START_RUN)
+    t1 = threading.Thread(target=bot.stamp_all, args=[])
+    t1.start()
+
+
+def preview():
+    text.delete(1.0, tk.END)
+    bot.stamp_ratio = float(scale.get())
+
+
+def _print(*argv):
+    for arg in argv:
+        text.insert(tk.INSERT, arg)
+    text.insert(tk.INSERT, "\n")
+    text.see("end")
+
+
+if __name__ == '__main__':
+    bot = StampBot()
+    root = ThemedTk(theme="arc")
+    # root = tk.Tk() # default theme
+    root.geometry('1500x700')
+    root.title("QR Stamp Tool")
+    root.configure(bg='#f5f6f7')
+    if platform == "win32":
+        dir_path = os.path.dirname(os.path.realpath(__file__))
+        root.wm_iconbitmap(dir_path+'/icon.ico')
+    left = ttk.Frame(root)
+    left.grid(column=0, row=0)
+
+    right = ttk.Frame(root)
+    right.grid(column=1, row=0)
+
+    fileschooser_frame = ttk.Frame(left)
+    fileschooser_frame.grid(column=0, row=0, padx=10)
+
+    csv_chooser_frame = ttk.Frame(fileschooser_frame)
+    csv_chooser_frame.grid(column=0, row=0, padx=10, pady=20)
+
+    scale_frame = ttk.Frame(left)
+    scale_frame.grid(column=0, row=1, padx=10, pady=10)
+
+    buttons_frame = ttk.Frame(left)
+    buttons_frame.grid(column=0, row=2, padx=10)
+
+    # stamp details
+    csv_label = ttk.Label(csv_chooser_frame, text="Choose CSV file:  ")
+    csv_label.grid(column=0, row=0)
+    csv_path_field = ttk.Entry(csv_chooser_frame, width=40)
+    csv_path_field.grid(column=0, row=1)
+    csv_browse = ttk.Button(csv_chooser_frame, text="Browse",
+                            command=csv_chooser_event)
+    csv_browse.grid(column=1, row=1, padx=10)
+
+    # scale
+    scale_label = ttk.Label(scale_frame, text="scale stamp:")
+    scale_label.grid(column=0, row=0)
+    scale = ttk.Scale(scale_frame, from_=0.05, to=0.2, length=300)
+    scale.set(0.15)
+    scale.grid(column=1, row=0, padx=10)
+
+    # run
+    run_btn = ttk.Button(buttons_frame, text="Run",
+                         command=run, width=20)
+    run_btn.grid(column=0, row=0, padx=10, pady=10)
+
+    # status
+    text = tk.Text(left)
+    text.grid(column=0, row=3, pady=10, padx=10)
+    text["width"] = 60
+    text["bg"] = "black"
+    text["fg"] = "green"
+
+    # preview
+    preview_btn = ttk.Button(buttons_frame, text="Random Preview >>",
+                             command=preview, width=20)
+    preview_btn.grid(column=1, row=0, padx=10, pady=10)
+    panel = ttk.Label(right, text="")
+    panel.pack()
+
+    root.mainloop()
