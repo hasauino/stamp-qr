@@ -9,9 +9,9 @@ from os import listdir
 from PIL import Image, ImageTk
 from os import mkdir, path
 import re
-from msgs import error_msgs as err
+from qr_stamp.msgs import error_msgs as err
 from random import randint
-from msgs import log_msgs as log
+from qr_stamp.msgs import log_msgs as log
 
 
 class StampBot:

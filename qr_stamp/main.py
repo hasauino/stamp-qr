@@ -3,11 +3,11 @@
 import tkinter as tk
 from tkinter import ttk
 from tkinter.filedialog import askopenfilename, askdirectory
-from stampper import StampBot
+from qr_stamp.stampper import StampBot
 import threading
 from ttkthemes import ThemedTk
-from msgs import error_msgs as err
-from msgs import log_msgs as log
+from qr_stamp.msgs import error_msgs as err
+from qr_stamp.msgs import log_msgs as log
 import os
 from sys import platform
 
