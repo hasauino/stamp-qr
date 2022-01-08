@@ -1,3 +1,4 @@
+from tkinter.constants import N
 import cv2
 import numpy as np
 import os
@@ -11,18 +12,19 @@ from os import mkdir, path
 import re
 from qr_stamp.msgs import error_msgs as err
 from random import randint
-from qr_stamp.msgs import log_msgs as log
+from qr_stamp.msgs import warning_msgs as warn
+from qr_stamp.msgs import info_msgs as info
 
 
 class StampBot:
-    def __init__(self):
+    def __init__(self, progress_bar):
+        self.progress_bar = progress_bar
         self.stamp_ratio = 0.2
         self.step_ratio = 0.1
         self.preview_size = 600
         self.stamp_path = None
         self.stamp = None
         self.ready = False
-        self.print = None
         pdf_re = r'.*\.pdf'
         img_re = r'.*\.(bmp|dib|jpeg|jpg|jpe|jp2|png|webp|pbm|pgm|ppm|pxm|pnm|pfm|sr|ras|tiff|tif|exr|hdr|pic)'
         self.pdf_pattern = re.compile(pdf_re, re.I)
@@ -135,6 +137,7 @@ class StampBot:
         return qr
 
     def stamp_all(self):
+        self.progress_bar['value'] = 5
         documents, data = self._check_directory()
         if data is None or documents is None:
             return None
@@ -143,11 +146,10 @@ class StampBot:
             try:
                 mkdir(out_dir)
             except:
-                self.print(err.MKDIR_FAIL)
+                err.MKDIR_FAIL.popup()
                 return None
 
         failed_documents = []
-        self.print(out_dir)
         for i, document in enumerate(documents):
             document_name = document.split("/")[-1]
             qr_stamp = self.generate_qr(document_name, data)
@@ -158,7 +160,6 @@ class StampBot:
                 except Image.DecompressionBombError:
                     pages = convert_from_path(document)
                 except:
-                    self.print(err.FILE_READ_FAIL, document_name)
                     failed_documents.append(document_name)
                     continue
                 # stamp only first page
@@ -174,21 +175,24 @@ class StampBot:
             else:
                 doc = cv2.imread(document)
                 if doc is None:
-                    self.print(err.FILE_READ_FAIL, document_name)
                     failed_documents.append(document_name)
                     continue
                 doc = self.add_stamp(
                     doc, qr_stamp, stamp_ratio=self.stamp_ratio)
                 cv2.imwrite(out_dir+"/"+document_name, doc)
 
-            self.print("stammped file: ",
-                       i+1, " progress: ",
-                       (i+1.0)/len(documents)*100.0, "%")
-        self.print(log.DONE_RUN)
-        self.print(log.SUCCESS_FILES %
-                   (len(documents)-len(failed_documents), len(documents)))
+            self.progress_bar['value'] = (i+1.0)/len(documents)*100.0
+        if len(failed_documents) > 0:
+            failed_docs_text = ("number of documents failed: {}\n.""numbe of documents succeeded: {}. \n\n").format(
+                len(failed_documents), len(documents)-len(failed_documents))
+            for doc in failed_documents:
+                failed_docs_text = "".join(
+                    [failed_docs_text, "\"{}\"".format(doc)+"\n________\n"])
+            warn.FAILED_FILES.popup(failed_docs_text)
+        else:
+            info.SUCCESS.popup()
 
-    def preview(self, panel):
+    def preview(self, size):
         documents, data = self._check_directory()
         if data is None or documents is None:
             return None
@@ -202,14 +206,14 @@ class StampBot:
             except Image.DecompressionBombError:
                 page = convert_from_path(document)[0]
             except:
-                self.print(err.FILE_READ_FAIL, document_name)
+                err.FILE_READ_FAIL.popup(document_name)
                 return None
             doc = np.array(page)
             doc = cv2.cvtColor(doc, cv2.COLOR_BGR2RGB)
         else:
             doc = cv2.imread(document)
             if doc is None:
-                self.print(err.FILE_READ_FAIL, document_name)
+                err.FILE_READ_FAIL.popup(document_name)
                 return None
 
         ratio = doc.shape[1]/doc.shape[0]
@@ -217,15 +221,12 @@ class StampBot:
             doc, qr_stamp, stamp_ratio=self.stamp_ratio)
         doc = cv2.cvtColor(doc, cv2.COLOR_RGB2BGR)
         page = Image.fromarray(doc)
-        size = self.preview_size
         page = page.resize((int(size*ratio), size))
         img = ImageTk.PhotoImage(page)
         if img:
-            panel.configure(image=img)
-            panel.image = img
-            self.print(log.PREVIEW_DONE)
+            return img
         else:
-            self.print(err.PREVIEW_FAIL)
+            return None
 
     def is_valid_invocie(self, document_abs_path):
         document_name = document_abs_path.split("/")[-1]
@@ -235,20 +236,23 @@ class StampBot:
 
     def _check_directory(self):
         documents = list()
+        if self.dir_path is None or len(self.dir_path) == 0:
+            warn.CHOOSE_CSV.popup()
+            return None, None
         try:
             for document in os.listdir(self.dir_path):
                 document_abs_path = os.path.join(self.dir_path, document)
                 if self.is_valid_invocie(document_abs_path):
                     documents.append(document_abs_path)
         except FileNotFoundError as e:
-            self.print(e)
+            err.Error.popup(e)
             return None, None
         if len(documents) == 0:
-            self.print(err.NO_FILES)
+            err.NO_FILES.popup()
             return None, None
 
         if not path.exists(self.csv_path):
-            self.print(err.CSV_NOT_FOUND)
+            err.CSV_NOT_FOUND.popup()
             return None, None
 
         data = dict()
@@ -266,15 +270,15 @@ class StampBot:
         # TODO: print warning if length of row is < documents
 
         except FileNotFoundError:
-            self.print(err.CSV_OPEN)
+            err.CSV_OPEN.popup()
             return None, None
 
         except IndexError:
-            self.print(err.CSV_FORMAT)
+            err.CSV_FORMAT.popup()
             return None, None
 
         except Exception as e:
-            self.print(e)
+            err.Error.popup(e)
             return None, None
 
         return documents, data
