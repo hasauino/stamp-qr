@@ -189,7 +189,43 @@ class StampBot:
                    (len(documents)-len(failed_documents), len(documents)))
 
     def preview(self, panel):
-        pass
+        documents, data = self._check_directory()
+        if data is None or documents is None:
+            return None
+        rand_index = randint(0, len(documents)-1)
+        document = documents[rand_index]
+        document_name = document.split("/")[-1]
+        qr_stamp = self.generate_qr(document_name, data)
+        if self.pdf_pattern.match(document_name):
+            try:
+                page = convert_from_path(document, dpi=400)[0]
+            except Image.DecompressionBombError:
+                page = convert_from_path(document)[0]
+            except:
+                self.print(err.FILE_READ_FAIL, document_name)
+                return None
+            doc = np.array(page)
+            doc = cv2.cvtColor(doc, cv2.COLOR_BGR2RGB)
+        else:
+            doc = cv2.imread(document)
+            if doc is None:
+                self.print(err.FILE_READ_FAIL, document_name)
+                return None
+
+        ratio = doc.shape[1]/doc.shape[0]
+        doc = self.add_stamp(
+            doc, qr_stamp, stamp_ratio=self.stamp_ratio)
+        doc = cv2.cvtColor(doc, cv2.COLOR_RGB2BGR)
+        page = Image.fromarray(doc)
+        size = self.preview_size
+        page = page.resize((int(size*ratio), size))
+        img = ImageTk.PhotoImage(page)
+        if img:
+            panel.configure(image=img)
+            panel.image = img
+            self.print(log.PREVIEW_DONE)
+        else:
+            self.print(err.PREVIEW_FAIL)
 
     def is_valid_invocie(self, document_abs_path):
         document_name = document_abs_path.split("/")[-1]

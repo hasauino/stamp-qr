@@ -33,6 +33,11 @@ def run():
 def preview():
     text.delete(1.0, tk.END)
     bot.stamp_ratio = float(scale.get())
+    bot.csv_path = csv_path_field.get()
+    bot.print = _print
+    preview_thread = threading.Thread(target=bot.preview, args=[panel])
+    preview_thread.start()
+    bot.print(log.START_PREVIEW)
 
 
 def _print(*argv):
