@@ -7,18 +7,18 @@
 # If you change the names "app.exe", "logo.ico", or "license.rtf" you should do a search and replace - they
 # show up in a few places.
 # All the other settings can be tweaked by editing the !defines at the top of this script
-!define APPNAME "AutoStamp"
+!define APPNAME "StampQR"
 !define COMPANYNAME "Warshat"
 !define PUBLISHER "Hassan Umari"
-!define DESCRIPTION "A tool to stamp a batch of documents"
+!define DESCRIPTION "A tool to apply KSA VAT compatible QR stamp on a batch of documents"
 # These three must be integers
 !define VERSIONMAJOR 0
 !define VERSIONMINOR 0
 !define VERSIONBUILD 2
 # These will be displayed by the "Click here for support information" link in "Add/Remove Programs"
 # It is possible to use "mailto:" links in here to open the email client
-!define HELPURL "https://github.com/hasauino/auto_stamp/" # "Support Information" link
-!define UPDATEURL "https://github.com/hasauino/auto_stamp/releases" # "Product Updates" link
+!define HELPURL "https://github.com/hasauino/stamp-qr" # "Support Information" link
+!define UPDATEURL "https://github.com/hasauino/stamp-qr/releases" # "Product Updates" link
 !define ABOUTURL "https://hasauino.github.io/" # "Publisher" link
 # This is the size (in kB) of all the files copied into "Program Files"
 !define INSTALLSIZE 139060
@@ -62,17 +62,17 @@ section "install"
     File /nonfatal /a /r "poppler\"
 
     SetOutPath $INSTDIR
-    File /nonfatal /a /r "AutoStamp\"
+    File /nonfatal /a /r "StampQR\"
 
     SetOutPath $INSTDIR
 	writeUninstaller "$INSTDIR\uninstall.exe"
  
 	# Start Menu
 	createDirectory "$SMPROGRAMS\${APPNAME}"
-	createShortCut "$SMPROGRAMS\${APPNAME}\${APPNAME}.lnk" "$INSTDIR\AutoStamp.exe" "" "$INSTDIR\icon.ico"
+	createShortCut "$SMPROGRAMS\${APPNAME}\${APPNAME}.lnk" "$INSTDIR\StampQR.exe" "" "$INSTDIR\icon.ico"
 
 	# Desktop shortcut
-	CreateShortCut "$DESKTOP\AutoStamp.lnk" "$INSTDIR\AutoStamp.exe" "" "$INSTDIR\icon.ico" 0
+	CreateShortCut "$DESKTOP\StampQR.lnk" "$INSTDIR\StampQR.exe" "" "$INSTDIR\icon.ico" 0
  
 	# Registry information for add/remove programs
 	WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APPNAME}" "DisplayName" "${APPNAME} - ${DESCRIPTION}"
@@ -115,7 +115,7 @@ section "uninstall"
 	EnVar::DeleteValue "PATH" "$INSTDIR\poppler\bin"
 	
 	# Remove Desktop shortcut
-	Delete "$DESKTOP\AutoStamp.lnk"
+	Delete "$DESKTOP\StampQR.lnk"
 	# Remove Start Menu launcher
 	delete "$SMPROGRAMS\${APPNAME}\${APPNAME}.lnk"
 	# Try to remove the Start Menu folder - this will only happen if it is empty
@@ -123,7 +123,7 @@ section "uninstall"
  
 	# Remove files
     RMDir "$INSTDIR\poppler"
-    Delete $INSTDIR\AutoStamp.exe
+    Delete $INSTDIR\StampQR.exe
 
     # Remove uninstaller information from the registry
 	DeleteRegKey HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APPNAME}"
