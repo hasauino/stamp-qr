@@ -16,6 +16,14 @@ from qr_stamp.msgs import warning_msgs as warn
 from qr_stamp.msgs import info_msgs as info
 
 
+class EncodingError(Exception):
+    pass
+
+
+class QRGenerationError(Exception):
+    pass
+
+
 class StampBot:
     def __init__(self, progress_bar):
         self.progress_bar = progress_bar
@@ -129,14 +137,29 @@ class StampBot:
         indx_start, indx_end = self.invoice_pattern.match(
             document_name).span()
         document_key = document_name[indx_start:indx_end]
-        qr_raw_text = self.get_invocie_text(data[document_key])
-        qr_encoded_text = self.encode(qr_raw_text)
-        qr_pil_img = qrcode.make(qr_encoded_text)
-        gray_qr = np.uint8(np.array(qr_pil_img) * 255)
-        qr = cv2.cvtColor(gray_qr, cv2.COLOR_GRAY2RGB)
+        if document_key not in data:
+            raise KeyError
+        try:
+            qr_raw_text = self.get_invocie_text(data[document_key])
+            qr_encoded_text = self.encode(qr_raw_text)
+        except:
+            raise EncodingError
+        try:
+            qr_pil_img = qrcode.make(qr_encoded_text)
+            gray_qr = np.uint8(np.array(qr_pil_img) * 255)
+            qr = cv2.cvtColor(gray_qr, cv2.COLOR_GRAY2RGB)
+        except:
+            raise QRGenerationError
         return qr
 
     def stamp_all(self):
+        skipped_total = 0
+        skipped_documents = {
+            "key_error": [],
+            "encoding_error": [],
+            "qr_generation_error": [],
+            "read_error": [],
+        }
         self.progress_bar['value'] = 5
         documents, data = self._check_directory()
         if data is None or documents is None:
@@ -149,10 +172,23 @@ class StampBot:
                 err.MKDIR_FAIL.popup()
                 return None
 
-        failed_documents = []
         for i, document in enumerate(documents):
             document_name = document.split("/")[-1]
-            qr_stamp = self.generate_qr(document_name, data)
+            try:
+                qr_stamp = self.generate_qr(document_name, data)
+            except KeyError:
+                skipped_documents["key_error"].append(document_name)
+                skipped_total += 1
+                continue
+            except EncodingError:
+                skipped_documents["encoding_error"].append(document_name)
+                skipped_total += 1
+                continue
+            except QRGenerationError:
+                skipped_documents["qr_generation_error"].append(
+                    document_name)
+                skipped_total += 1
+                continue
             # if document is a PDF file (could have multiple pages)
             if self.pdf_pattern.match(document_name):
                 try:
@@ -160,7 +196,8 @@ class StampBot:
                 except Image.DecompressionBombError:
                     pages = convert_from_path(document)
                 except:
-                    failed_documents.append(document_name)
+                    skipped_documents["read_error"].append(document_name)
+                    skipped_total += 1
                     continue
                 # stamp only first page
                 doc = np.array(pages[0])
@@ -175,19 +212,47 @@ class StampBot:
             else:
                 doc = cv2.imread(document)
                 if doc is None:
-                    failed_documents.append(document_name)
+                    skipped_documents["read_error"].append(document_name)
+                    skipped_total += 1
                     continue
                 doc = self.add_stamp(
                     doc, qr_stamp, stamp_ratio=self.stamp_ratio)
                 cv2.imwrite(out_dir+"/"+document_name, doc)
 
             self.progress_bar['value'] = (i+1.0)/len(documents)*100.0
-        if len(failed_documents) > 0:
-            failed_docs_text = ("number of documents failed: {}\n.""numbe of documents succeeded: {}. \n\n").format(
-                len(failed_documents), len(documents)-len(failed_documents))
-            for doc in failed_documents:
-                failed_docs_text = "".join(
-                    [failed_docs_text, "\"{}\"".format(doc)+"\n________\n"])
+        if skipped_total > 0:
+            failed_docs_text = ("Did not stamp all documents!\n"
+                                "Number of documents that were skipped: {}\n"
+                                "number of documents succeeded: {} \n\n").format(skipped_total, len(documents)-skipped_total)
+            if len(skipped_documents["key_error"]) > 0:
+                failed_docs_text += "===========\n"
+                text = ""
+                for doc in skipped_documents["key_error"]:
+                    text += "\"{}\"\n________\n".format(doc)
+                failed_docs_text += "Documents that were skipped because no associated data is found in the CSV file:\n {} \n\n".format(
+                    text)
+            if len(skipped_documents["encoding_error"]) > 0:
+                failed_docs_text += "===========\n"
+                text = ""
+                for doc in skipped_documents["encoding_error"]:
+                    text += "\"{}\"\n________\n".format(doc)
+                failed_docs_text += "Documents that were skipped because the given invoice data is not correct (check invoice data in the CSV file):\n {}".format(
+                    text)
+            if len(skipped_documents["qr_generation_error"]) > 0:
+                failed_docs_text += "===========\n"
+                text = ""
+                for doc in skipped_documents["qr_generation_error"]:
+                    text += "\"{}\"\n________\n".format(doc)
+                failed_docs_text += "Documents that were skipped because of a failure in generating the QR image stamp: \n {}".format(
+                    text)
+            if len(skipped_documents["read_error"]) > 0:
+                failed_docs_text += "===========\n"
+                text = ""
+                for doc in skipped_documents["read_error"]:
+                    text += "\"{}\"\n________\n".format(doc)
+                failed_docs_text += "Documents that were skipped because of failure in reading the invoice file (check file format):\n {}".format(
+                    text)
+
             warn.FAILED_FILES.popup(failed_docs_text)
         else:
             info.SUCCESS.popup()
@@ -199,7 +264,17 @@ class StampBot:
         rand_index = randint(0, len(documents)-1)
         document = documents[rand_index]
         document_name = document.split("/")[-1]
-        qr_stamp = self.generate_qr(document_name, data)
+        try:
+            qr_stamp = self.generate_qr(document_name, data)
+        except KeyError:
+            err.KEY_ERROR.popup(document_name)
+            return
+        except EncodingError:
+            err.ENCODE_ERROR.popup(document_name)
+            return
+        except QRGenerationError:
+            err.QR_ERROR.popup(document_name)
+            return
         if self.pdf_pattern.match(document_name):
             try:
                 page = convert_from_path(document, dpi=400)[0]
@@ -258,7 +333,8 @@ class StampBot:
         data = dict()
         try:
             with open(self.csv_path, newline='') as csvfile:
-                file_reader = csv.reader(csvfile, delimiter=',', quotechar='|')
+                file_reader = csv.reader(
+                    csvfile, delimiter=',', quotechar='|')
                 for row in file_reader:
                     if self.invoice_pattern.match(row[-1]) is not None:
                         data[row[-1]] = {"company_name": row[0],

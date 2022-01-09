@@ -48,10 +48,14 @@ class error_msgs:
 
     Error = ErrorMsg(title="Error")
 
+    KEY_ERROR = ErrorMsg(title="No Data Error", body="No data is found in the CSV file for this file: \n")
+    ENCODE_ERROR = ErrorMsg(title="Data Format Error", body="Data format in CSV is wrong for the following file: \n")
+    QR_ERROR = ErrorMsg(title="QR Generation Error", body="Could not generate QR stamp image for the following file: \n")
+
 
 class warning_msgs:
     FAILED_FILES = WarningMsg(
-        title="Skipped some documents", body="Stampped all documents but the ones listed below have failed.\n\n")
+        title="Skipped some documents", body="")
     CHOOSE_CSV = WarningMsg(
         title="Choose CSV", body="Please choose an CSV file where the documents to be stamped are placed next to it in the same directory")
 
