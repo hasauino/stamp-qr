@@ -1,4 +1,3 @@
-from tkinter.constants import N
 import cv2
 import numpy as np
 import os
@@ -6,7 +5,6 @@ import csv
 import base64
 import qrcode
 from pdf2image import convert_from_path
-from os import listdir
 from PIL import Image, ImageTk
 from os import mkdir, path
 import re
@@ -14,6 +12,8 @@ from qr_stamp.msgs import error_msgs as err
 from random import randint
 from qr_stamp.msgs import warning_msgs as warn
 from qr_stamp.msgs import info_msgs as info
+from qr_stamp.msgs import WarningMsg
+from qr_stamp.msgs import generate_report
 
 
 class EncodingError(Exception):
@@ -221,39 +221,10 @@ class StampBot:
 
             self.progress_bar['value'] = (i+1.0)/len(documents)*100.0
         if skipped_total > 0:
-            failed_docs_text = ("Did not stamp all documents!\n"
-                                "Number of documents that were skipped: {}\n"
-                                "number of documents succeeded: {} \n\n").format(skipped_total, len(documents)-skipped_total)
-            if len(skipped_documents["key_error"]) > 0:
-                failed_docs_text += "===========\n"
-                text = ""
-                for doc in skipped_documents["key_error"]:
-                    text += "\"{}\"\n________\n".format(doc)
-                failed_docs_text += "Documents that were skipped because no associated data is found in the CSV file:\n {} \n\n".format(
-                    text)
-            if len(skipped_documents["encoding_error"]) > 0:
-                failed_docs_text += "===========\n"
-                text = ""
-                for doc in skipped_documents["encoding_error"]:
-                    text += "\"{}\"\n________\n".format(doc)
-                failed_docs_text += "Documents that were skipped because the given invoice data is not correct (check invoice data in the CSV file):\n {}".format(
-                    text)
-            if len(skipped_documents["qr_generation_error"]) > 0:
-                failed_docs_text += "===========\n"
-                text = ""
-                for doc in skipped_documents["qr_generation_error"]:
-                    text += "\"{}\"\n________\n".format(doc)
-                failed_docs_text += "Documents that were skipped because of a failure in generating the QR image stamp: \n {}".format(
-                    text)
-            if len(skipped_documents["read_error"]) > 0:
-                failed_docs_text += "===========\n"
-                text = ""
-                for doc in skipped_documents["read_error"]:
-                    text += "\"{}\"\n________\n".format(doc)
-                failed_docs_text += "Documents that were skipped because of failure in reading the invoice file (check file format):\n {}".format(
-                    text)
-
-            warn.FAILED_FILES.popup(failed_docs_text)
+            report = generate_report(
+                skipped_documents, skipped_total, len(documents))
+            error = WarningMsg(title="Skipped some documents", body=report)
+            error.popup()
         else:
             info.SUCCESS.popup()
 
@@ -343,7 +314,6 @@ class StampBot:
                                          "total_amount": row[3],
                                          "vat_amount": row[4]
                                          }
-        # TODO: print warning if length of row is < documents
 
         except FileNotFoundError:
             err.CSV_OPEN.popup()
