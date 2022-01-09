@@ -64,8 +64,6 @@ class StampBot:
         new_size = (int(new_col), int(new_row))
         stamp = cv2.resize(stamp, new_size, cv2.INTER_AREA)
         stamp_rows, stamp_cols, _ = stamp.shape
-        gray = cv2.cvtColor(stamp, cv2.COLOR_BGR2GRAY)
-        _, mask = cv2.threshold(gray, 245, 255, cv2.THRESH_BINARY_INV)
         graydoc = cv2.cvtColor(doc, cv2.COLOR_BGR2GRAY)
         step_check = int(step_ratio*doc_col)
         centers = []
@@ -84,12 +82,7 @@ class StampBot:
         location = centers[np.argmax(white_values)]
         pos_x = location[0] - stamp_rows
         pos_y = location[1] - stamp_cols
-        roi = doc[pos_x:pos_x+stamp_rows, pos_y:pos_y+stamp_cols]
-        mask_inv = cv2.bitwise_not(mask)
-        anded = cv2.bitwise_and(roi, roi, mask=mask_inv)
-        stamp = cv2.bitwise_and(stamp, stamp, mask=mask)
-        dst = cv2.add(anded, stamp)
-        doc[pos_x:pos_x+stamp_rows, pos_y:pos_y+stamp_cols] = dst
+        doc[pos_x:pos_x+stamp_rows, pos_y:pos_y+stamp_cols] = stamp
         return doc
 
     @staticmethod
