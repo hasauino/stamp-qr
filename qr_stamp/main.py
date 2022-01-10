@@ -23,7 +23,7 @@ def csv_chooser_event():
 def run():
     progress_bar["value"] = 0
     bot.stamp_ratio = float(scale.get())
-    bot.csv_path = csv_path_field.get()
+    bot.dir_path = csv_path_field.get()
     bot.print = pop_up
     t1 = threading.Thread(target=bot.stamp_all, args=[])
     t1.start()
@@ -98,7 +98,7 @@ if __name__ == '__main__':
     buttons_frame.grid(column=0, row=2, padx=10)
 
     # stamp details
-    csv_label = ttk.Label(csv_chooser_frame, text="Choose CSV file:  ")
+    csv_label = ttk.Label(csv_chooser_frame, text="Choose invoices (Excel files) directory:  ")
     csv_label.grid(column=0, row=0)
     csv_path_field = ttk.Entry(csv_chooser_frame, width=40)
     csv_path_field.grid(column=0, row=1)

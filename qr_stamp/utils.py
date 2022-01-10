@@ -4,6 +4,7 @@ import os
 
 
 def generate_pdf_and_read_data(document_path):
+    doc_name = document_path.split("\\")[-1][0:-5]
     excel = win32.gencache.EnsureDispatch('Excel.Application')
     wb = excel.Workbooks.Open(document_path)
     sheet_name = [sh.Name for sh in wb.Sheets][0]
@@ -16,7 +17,7 @@ def generate_pdf_and_read_data(document_path):
     date = "{}-{}-{}".format(date_raw.day, date_raw.month, date_raw.year) 
 
     tmp_dir = tempfile.gettempdir()
-    tmp_file_path = os.path.join(tmp_dir, "invoice_tmp_pdf.pdf")
+    tmp_file_path = os.path.join(tmp_dir, "{}.pdf".format(doc_name))
     wb.ExportAsFixedFormat (0, tmp_file_path, 0, True, False)
     wb.Close()
     excel.Application.Quit()
@@ -27,4 +28,4 @@ def generate_pdf_and_read_data(document_path):
         "total_amount": str(total_amount),
         "date": date
     }
-    return tmp_file_path, data
+    return tmp_file_path.replace("\\", "/"), data

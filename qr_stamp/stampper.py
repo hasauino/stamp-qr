@@ -43,18 +43,6 @@ class StampBot:
         self.invoice_pattern = re.compile("MENA\d+")
         self.file_pattern = re.compile("(%s|%s)" % (pdf_re, img_re))
         self.dir_path = None
-        self._csv_path = None
-        self.csv_file_name = None
-
-    @property
-    def csv_path(self):
-        return self._csv_path
-
-    @csv_path.setter
-    def csv_path(self, path):
-        self._csv_path = path
-        self.csv_file_name = self._csv_path.split("/")[-1]
-        self.dir_path = self._csv_path[:-len(self.csv_file_name)]
 
     @staticmethod
     def add_stamp(doc, stamp, stamp_ratio=0.2, step_ratio=0.1):
@@ -156,19 +144,13 @@ class StampBot:
         if documents is None:
             return None
         out_dir = self.dir_path + "out_docs"
-        tmp_dir = self.dir_path + "tmp"
         if not path.exists(out_dir):
             try:
                 mkdir(out_dir)
             except:
                 err.MKDIR_FAIL.popup()
-                return None
-        if not path.exists(tmp_dir):
-            try:
-                mkdir(tmp_dir)
-            except:
-                err.MKDIR_FAIL.popup()
-                return None                
+                return None               
+
 
         for i, document_orig in enumerate(documents):
             document, data = generate_pdf_and_read_data(document_orig)
