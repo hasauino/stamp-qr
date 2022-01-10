@@ -40,7 +40,7 @@ class error_msgs:
     FILE_READ_FAIL = ErrorMsg(title="Documents Error",
                               body="Could not read document: ")
     MKDIR_FAIL = ErrorMsg(title="Output Directory Error",
-                          body="Could not create output directory")
+                          body="Could not create output directory")                         
     CSV_NOT_FOUND = ErrorMsg(
         title="CSV Error", body="Could not find CSV file in chosen directory")
     CSV_OPEN = ErrorMsg(title="CSV Error", body="Could not open CSV file")
@@ -66,6 +66,8 @@ class warning_msgs:
         title="Choose CSV", body=("Please choose an CSV file where"
                                   " the documents to be stamped are placed"
                                   " next to it in the same directory"))
+    CHOOSE_DIR = WarningMsg(
+        title="Choose Directory", body=("Please choose a directory"))                                  
 
 
 class info_msgs:

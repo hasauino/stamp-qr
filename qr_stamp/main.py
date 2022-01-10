@@ -2,7 +2,7 @@
 
 import tkinter as tk
 from tkinter import ttk
-from tkinter.filedialog import askopenfilename
+from tkinter.filedialog import askdirectory
 from qr_stamp.stampper import StampBot
 import threading
 from ttkthemes import ThemedTk
@@ -13,7 +13,7 @@ from qr_stamp.msgs import error_msgs as err
 
 def csv_chooser_event():
     text = csv_path_field.get()
-    selected = askopenfilename()
+    selected = askdirectory()
     if not len(selected) == 0:
         csv_path_field.delete(first=0, last=len(text))
         csv_path_field.insert(0, selected)

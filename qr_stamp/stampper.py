@@ -14,6 +14,7 @@ from qr_stamp.msgs import warning_msgs as warn
 from qr_stamp.msgs import info_msgs as info
 from qr_stamp.msgs import WarningMsg
 from qr_stamp.msgs import generate_report
+from qr_stamp.utils import generate_pdf_and_read_data
 
 
 class EncodingError(Exception):
@@ -34,9 +35,11 @@ class StampBot:
         self.stamp = None
         self.ready = False
         pdf_re = r'.*\.pdf'
+        xlsx_re = r'.*\.xlsx'
         img_re = r'.*\.(bmp|dib|jpeg|jpg|jpe|jp2|png|webp|pbm|pgm|ppm|pxm|pnm|pfm|sr|ras|tiff|tif|exr|hdr|pic)'
         self.pdf_pattern = re.compile(pdf_re, re.I)
         self.img_pattern = re.compile(img_re, re.I)
+        self.xlsx_pattern = re.compile(xlsx_re, re.I)
         self.invoice_pattern = re.compile("MENA\d+")
         self.file_pattern = re.compile("(%s|%s)" % (pdf_re, img_re))
         self.dir_path = None
@@ -126,14 +129,9 @@ class StampBot:
         base64_message = base64_bytes.decode('ascii')
         return base64_message
 
-    def generate_qr(self, document_name, data):
-        indx_start, indx_end = self.invoice_pattern.match(
-            document_name).span()
-        document_key = document_name[indx_start:indx_end]
-        if document_key not in data:
-            raise KeyError
+    def generate_qr(self, data):
         try:
-            qr_raw_text = self.get_invocie_text(data[document_key])
+            qr_raw_text = self.get_invocie_text(data)
             qr_encoded_text = self.encode(qr_raw_text)
         except:
             raise EncodingError
@@ -154,21 +152,29 @@ class StampBot:
             "read_error": [],
         }
         self.progress_bar['value'] = 5
-        documents, data = self._check_directory()
-        if data is None or documents is None:
+        documents = self._check_directory()
+        if documents is None:
             return None
         out_dir = self.dir_path + "out_docs"
+        tmp_dir = self.dir_path + "tmp"
         if not path.exists(out_dir):
             try:
                 mkdir(out_dir)
             except:
                 err.MKDIR_FAIL.popup()
                 return None
-
-        for i, document in enumerate(documents):
-            document_name = document.split("/")[-1]
+        if not path.exists(tmp_dir):
             try:
-                qr_stamp = self.generate_qr(document_name, data)
+                mkdir(tmp_dir)
+            except:
+                err.MKDIR_FAIL.popup()
+                return None                
+
+        for i, document_orig in enumerate(documents):
+            document, data = generate_pdf_and_read_data(document_orig)
+            document_name = document.split("/")[-1] # TODO fix for windows file path format
+            try:
+                qr_stamp = self.generate_qr(data)
             except KeyError:
                 skipped_documents["key_error"].append(document_name)
                 skipped_total += 1
@@ -182,35 +188,26 @@ class StampBot:
                     document_name)
                 skipped_total += 1
                 continue
-            # if document is a PDF file (could have multiple pages)
-            if self.pdf_pattern.match(document_name):
-                try:
-                    pages = convert_from_path(document, dpi=400)
-                except Image.DecompressionBombError:
-                    pages = convert_from_path(document)
-                except:
-                    skipped_documents["read_error"].append(document_name)
-                    skipped_total += 1
-                    continue
-                # stamp only first page
-                doc = np.array(pages[0])
-                doc = cv2.cvtColor(doc, cv2.COLOR_BGR2RGB)
-                doc = self.add_stamp(doc, qr_stamp,
-                                     stamp_ratio=self.stamp_ratio)
-                doc = cv2.cvtColor(doc, cv2.COLOR_RGB2BGR)
-                stamped_page = Image.fromarray(doc)
-                stamped_page.save(out_dir+"/"+document_name[:-4]+".pdf",
-                                  save_all=True,
-                                  append_images=pages[1:])
-            else:
-                doc = cv2.imread(document)
-                if doc is None:
-                    skipped_documents["read_error"].append(document_name)
-                    skipped_total += 1
-                    continue
-                doc = self.add_stamp(
-                    doc, qr_stamp, stamp_ratio=self.stamp_ratio)
-                cv2.imwrite(out_dir+"/"+document_name, doc)
+
+            try:
+                pages = convert_from_path(document, dpi=400)
+            except Image.DecompressionBombError:
+                pages = convert_from_path(document)
+            except:
+                skipped_documents["read_error"].append(document_name)
+                skipped_total += 1
+                continue
+            # stamp only first page
+            doc = np.array(pages[0])
+            doc = cv2.cvtColor(doc, cv2.COLOR_BGR2RGB)
+            doc = self.add_stamp(doc, qr_stamp,
+                                    stamp_ratio=self.stamp_ratio)
+            doc = cv2.cvtColor(doc, cv2.COLOR_RGB2BGR)
+            stamped_page = Image.fromarray(doc)
+            stamped_page.save(out_dir+"/"+document_name[:-4]+".pdf",
+                                save_all=True,
+                                append_images=pages[1:])
+
 
             self.progress_bar['value'] = (i+1.0)/len(documents)*100.0
         if skipped_total > 0:
@@ -269,15 +266,15 @@ class StampBot:
 
     def is_valid_invocie(self, document_abs_path):
         document_name = document_abs_path.split("/")[-1]
-        if self.file_pattern.match(document_name) and self.invoice_pattern.match(document_name):
+        if self.xlsx_pattern.match(document_name):
             return True
         return False
 
     def _check_directory(self):
         documents = list()
         if self.dir_path is None or len(self.dir_path) == 0:
-            warn.CHOOSE_CSV.popup()
-            return None, None
+            warn.CHOOSE_DIR.popup()
+            return None
         try:
             for document in os.listdir(self.dir_path):
                 document_abs_path = os.path.join(self.dir_path, document)
@@ -285,39 +282,8 @@ class StampBot:
                     documents.append(document_abs_path)
         except FileNotFoundError as e:
             err.Error.popup(e)
-            return None, None
+            return None
         if len(documents) == 0:
             err.NO_FILES.popup()
-            return None, None
-
-        if not path.exists(self.csv_path):
-            err.CSV_NOT_FOUND.popup()
-            return None, None
-
-        data = dict()
-        try:
-            with open(self.csv_path, newline='') as csvfile:
-                file_reader = csv.reader(
-                    csvfile, delimiter=',', quotechar='|')
-                for row in file_reader:
-                    if self.invoice_pattern.match(row[-1]) is not None:
-                        data[row[-1]] = {"company_name": row[0],
-                                         "vat_number": row[1],
-                                         "date": row[2],
-                                         "total_amount": row[3],
-                                         "vat_amount": row[4]
-                                         }
-
-        except FileNotFoundError:
-            err.CSV_OPEN.popup()
-            return None, None
-
-        except IndexError:
-            err.CSV_FORMAT.popup()
-            return None, None
-
-        except Exception as e:
-            err.Error.popup(e)
-            return None, None
-
-        return documents, data
+            return None
+        return documents

@@ -22,9 +22,9 @@ def generate_pdf_and_read_data(document_path):
     excel.Application.Quit()
     data = {
         "company_name":issuer,
-        "vat_number": vat_num,
-        "vat_amount": vat_amount,
-        "total_amount": total_amount,
+        "vat_number": str(vat_num),
+        "vat_amount": str(vat_amount),
+        "total_amount": str(total_amount),
         "date": date
     }
     return tmp_file_path, data
