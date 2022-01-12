@@ -28,10 +28,7 @@ def dir_chooser_event():
 
 def run():
     progress_bar["value"] = 0
-    bot.stamp_ratio = float(scale.get())
-    bot.dir_path = path_field.get()
-    bot.print = pop_up
-    t1 = threading.Thread(target=bot.stamp_all, args=[])
+    t1 = threading.Thread(target=bot.stamp_all, args=[path_field.get(), float(scale.get()),])
     t1.start()
 
 
@@ -41,7 +38,6 @@ def preview():
     progress_bar["value"] = 0
     bot.stamp_ratio = float(scale.get())
     bot.csv_path = path_field.get()
-    bot.print = pop_up
     img = bot.preview(size=int(height))
     if img is None:
         return
@@ -118,5 +114,5 @@ if __name__ == '__main__':
     progress_bar = ttk.Progressbar(
         left, orient="horizontal", length=WIDTH, mode='determinate')
     progress_bar.grid(column=0, row=4, padx=0, pady=10)
-    bot = StampBot(progress_bar=progress_bar)
+    bot = StampBot(progress_bar=progress_bar, popup_logger= pop_up)
     root.mainloop()

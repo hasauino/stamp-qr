@@ -28,23 +28,12 @@ class QRGenerationError(Exception):
 
 
 class StampBot:
-    def __init__(self, progress_bar):
+    def __init__(self, progress_bar, popup_logger, step_ratio=0.1):
         self.progress_bar = progress_bar
-        self.stamp_ratio = 0.2
-        self.step_ratio = 0.1
-        self.preview_size = 600
-        self.stamp_path = None
-        self.stamp = None
-        self.ready = False
-        pdf_re = r'.*\.pdf'
+        self.step_ratio = step_ratio
         xlsx_re = r'.*\.xlsx'
-        img_re = r'.*\.(bmp|dib|jpeg|jpg|jpe|jp2|png|webp|pbm|pgm|ppm|pxm|pnm|pfm|sr|ras|tiff|tif|exr|hdr|pic)'
-        self.pdf_pattern = re.compile(pdf_re, re.I)
-        self.img_pattern = re.compile(img_re, re.I)
         self.xlsx_pattern = re.compile(xlsx_re, re.I)
-        self.invoice_pattern = re.compile("MENA\d+")
-        self.file_pattern = re.compile("(%s|%s)" % (pdf_re, img_re))
-        self.dir_path = None
+        self.print = popup_logger
 
     @staticmethod
     def add_stamp(doc, stamp, stamp_ratio=0.2, step_ratio=0.1):
@@ -119,10 +108,11 @@ class StampBot:
         base64_message = base64_bytes.decode('ascii')
         return base64_message
 
-    def generate_qr(self, data):
+    @staticmethod
+    def generate_qr(data):
         try:
-            qr_raw_text = self.get_invocie_text(data)
-            qr_encoded_text = self.encode(qr_raw_text)
+            qr_raw_text = StampBot.get_invocie_text(data)
+            qr_encoded_text = StampBot.encode(qr_raw_text)
         except:
             raise EncodingError
         try:
@@ -133,7 +123,7 @@ class StampBot:
             raise QRGenerationError
         return qr
 
-    def stamp_all(self):
+    def stamp_all(self, dir_path, stamp_ratio):
         skipped_total = 0
         skipped_documents = {
             "key_error": [],
@@ -142,21 +132,19 @@ class StampBot:
             "read_error": [],
         }
         self.progress_bar['value'] = 5
-        documents = self._check_directory()
+        documents = self.check_directory()
         if documents is None:
             return None
-        out_dir = self.dir_path + "out_docs"
+        out_dir = os.path.join(dir_path, "out_docs")
         if not path.exists(out_dir):
             try:
                 mkdir(out_dir)
             except:
                 err.MKDIR_FAIL.popup()
                 return None               
-
-
-        for i, document_orig in enumerate(documents):
-            document, data = generate_pdf_and_read_data(document_orig)
-            document_name = document.split("/")[-1] # TODO fix for windows file path format
+        for i, excel_document_path in enumerate(documents):
+            document_abs_path, data = generate_pdf_and_read_data(excel_document_path)
+            document_name = document_abs_path.split("/")[-1]
             try:
                 qr_stamp = self.generate_qr(data)
             except KeyError:
@@ -174,9 +162,9 @@ class StampBot:
                 continue
 
             try:
-                pages = convert_from_path(document, dpi=400)
+                pages = convert_from_path(document_abs_path, dpi=400)
             except Image.DecompressionBombError:
-                pages = convert_from_path(document)
+                pages = convert_from_path(document_abs_path)
             except:
                 skipped_documents["read_error"].append(document_name)
                 skipped_total += 1
@@ -184,8 +172,7 @@ class StampBot:
             # stamp only first page
             doc = np.array(pages[0])
             doc = cv2.cvtColor(doc, cv2.COLOR_BGR2RGB)
-            doc = self.add_stamp(doc, qr_stamp,
-                                    stamp_ratio=self.stamp_ratio)
+            doc = self.add_stamp(doc, qr_stamp, stamp_ratio=stamp_ratio, step_ratio=self.step_ratio)
             doc = cv2.cvtColor(doc, cv2.COLOR_RGB2BGR)
             stamped_page = Image.fromarray(doc)
             stamped_page.save(out_dir+"/"+document_name[:-4]+".pdf",
@@ -203,7 +190,7 @@ class StampBot:
             info.SUCCESS.popup()
 
     def preview(self, size):
-        documents, data = self._check_directory()
+        documents, data = self.check_directory()
         if data is None or documents is None:
             return None
         rand_index = randint(0, len(documents)-1)
@@ -254,7 +241,7 @@ class StampBot:
             return True
         return False
 
-    def _check_directory(self):
+    def check_directory(self):
         documents = list()
         if self.dir_path is None or len(self.dir_path) == 0:
             warn.CHOOSE_DIR.popup()
