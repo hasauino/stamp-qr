@@ -27,4 +27,6 @@ wheels/
 *.egg
 *.dump
 *.spec
-
+docs/distribution/StampQR
+docs/distribution/poppler
+docs/distribution/installer.exe

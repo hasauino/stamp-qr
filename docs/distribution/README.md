@@ -5,7 +5,7 @@
 #### PyInstaller
 
 ```bash
-pyinstaller.exe --name AutoStamp --icon=icon.ico gui.py --hidden-import='pkg_resources.py2_warn' --hidden-import='PIL._tkinter_finder --noconsole'
+pyinstaller.exe --name StampQR--icon=qr_stamp\icon.ico qr_stamp\main.py --hidden-import='pkg_resources.py2_warn' --hidden-import='PIL._tkinter_finder --noconsole'
 ```
 
 
