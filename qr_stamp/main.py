@@ -3,6 +3,7 @@
 import os
 import threading
 import tkinter as tk
+from pathlib import Path
 from sys import platform
 from tkinter import ttk
 from tkinter.filedialog import askdirectory
@@ -10,7 +11,6 @@ from tkinter.filedialog import askdirectory
 from ttkthemes import ThemedTk
 
 from qr_stamp.stampper import StampBot
-
 
 PREVIEW_ASPECT_RATIO = 1.4142
 WIDTH = 560
@@ -22,7 +22,7 @@ def dir_chooser_event():
     selected = askdirectory()
     if not len(selected) == 0:
         path_field.delete(first=0, last=len(text))
-        path_field.insert(0, selected)
+        path_field.insert(0, Path(selected))
         progress_bar["value"] = 0
 
 
@@ -36,9 +36,7 @@ def preview():
     width = root.winfo_screenwidth()*0.3
     height = width*PREVIEW_ASPECT_RATIO
     progress_bar["value"] = 0
-    bot.stamp_ratio = float(scale.get())
-    bot.csv_path = path_field.get()
-    img = bot.preview(size=int(height))
+    img = bot.preview(size=int(height), dir_path=path_field.get(), stamp_ratio=float(scale.get()))
     if img is None:
         return
     preview_window = tk.Toplevel(root)

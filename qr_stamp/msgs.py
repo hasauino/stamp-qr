@@ -40,19 +40,10 @@ class error_msgs:
     FILE_READ_FAIL = ErrorMsg(title="Documents Error",
                               body="Could not read document: ")
     MKDIR_FAIL = ErrorMsg(title="Output Directory Error",
-                          body="Could not create output directory")                         
-    CSV_NOT_FOUND = ErrorMsg(
-        title="CSV Error", body="Could not find CSV file in chosen directory")
-    CSV_OPEN = ErrorMsg(title="CSV Error", body="Could not open CSV file")
-    CSV_FORMAT = ErrorMsg(title="CSV Error", body="Wrong format of CSV file")
-
+                          body="Could not create output directory")
     Error = ErrorMsg(title="Error")
-
-    KEY_ERROR = ErrorMsg(
-        title="No Data Error", body=("No data is found in the CSV file"
-                                     " for this file: \n"))
     ENCODE_ERROR = ErrorMsg(title="Data Format Error",
-                            body=("Data format in CSV is wrong for the"
+                            body=("Data format in Excel sheet is wrong for the"
                                   " following file: \n"))
     QR_ERROR = ErrorMsg(title="QR Generation Error",
                         body=("Could not generate QR stamp image for the"

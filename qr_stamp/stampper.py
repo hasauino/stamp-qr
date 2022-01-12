@@ -3,6 +3,7 @@ import csv
 import os
 import re
 from os import mkdir, path
+from pathlib import Path
 from random import randint
 
 import cv2
@@ -17,6 +18,7 @@ from qr_stamp.msgs import generate_report
 from qr_stamp.msgs import info_msgs as info
 from qr_stamp.msgs import warning_msgs as warn
 from qr_stamp.utils import generate_pdf_and_read_data
+from utils import get_file_name
 
 
 class EncodingError(Exception):
@@ -132,11 +134,11 @@ class StampBot:
             "read_error": [],
         }
         self.progress_bar['value'] = 5
-        documents = self.check_directory()
+        documents = self.check_directory(dir_path)
         if documents is None:
             return None
-        out_dir = os.path.join(dir_path, "out_docs")
-        if not path.exists(out_dir):
+        out_dir = Path(dir_path) / "out_docs"
+        if not out_dir.exists():
             try:
                 mkdir(out_dir)
             except:
@@ -144,13 +146,9 @@ class StampBot:
                 return None               
         for i, excel_document_path in enumerate(documents):
             document_abs_path, data = generate_pdf_and_read_data(excel_document_path)
-            document_name = document_abs_path.split("/")[-1]
+            document_name = get_file_name(document_abs_path)
             try:
                 qr_stamp = self.generate_qr(data)
-            except KeyError:
-                skipped_documents["key_error"].append(document_name)
-                skipped_total += 1
-                continue
             except EncodingError:
                 skipped_documents["encoding_error"].append(document_name)
                 skipped_total += 1
@@ -160,7 +158,6 @@ class StampBot:
                     document_name)
                 skipped_total += 1
                 continue
-
             try:
                 pages = convert_from_path(document_abs_path, dpi=400)
             except Image.DecompressionBombError:
@@ -175,11 +172,10 @@ class StampBot:
             doc = self.add_stamp(doc, qr_stamp, stamp_ratio=stamp_ratio, step_ratio=self.step_ratio)
             doc = cv2.cvtColor(doc, cv2.COLOR_RGB2BGR)
             stamped_page = Image.fromarray(doc)
-            stamped_page.save(out_dir+"/"+document_name[:-4]+".pdf",
-                                save_all=True,
-                                append_images=pages[1:])
-
-
+            output_path = out_dir / "{}.pdf".format(Path(document_name).stem)
+            stamped_page.save(output_path,
+                              save_all=True,
+                              append_images=pages[1:])
             self.progress_bar['value'] = (i+1.0)/len(documents)*100.0
         if skipped_total > 0:
             report = generate_report(
@@ -189,44 +185,33 @@ class StampBot:
         else:
             info.SUCCESS.popup()
 
-    def preview(self, size):
-        documents, data = self.check_directory()
-        if data is None or documents is None:
+    def preview(self, dir_path, stamp_ratio, size):
+        documents = self.check_directory(dir_path)
+        if documents is None:
             return None
         rand_index = randint(0, len(documents)-1)
-        document = documents[rand_index]
-        document_name = document.split("/")[-1]
+        excel_document_path = documents[rand_index]
+        document_abs_path, data = generate_pdf_and_read_data(excel_document_path)
         try:
-            qr_stamp = self.generate_qr(document_name, data)
-        except KeyError:
-            err.KEY_ERROR.popup(document_name)
-            return
+            qr_stamp = self.generate_qr(data)
         except EncodingError:
-            err.ENCODE_ERROR.popup(document_name)
-            return
+            err.ENCODE_ERROR.popup(get_file_name(excel_document_path))
+            return None
         except QRGenerationError:
-            err.QR_ERROR.popup(document_name)
-            return
-        if self.pdf_pattern.match(document_name):
-            try:
-                page = convert_from_path(document, dpi=400)[0]
-            except Image.DecompressionBombError:
-                page = convert_from_path(document)[0]
-            except:
-                err.FILE_READ_FAIL.popup(document_name)
-                return None
-            doc = np.array(page)
-            doc = cv2.cvtColor(doc, cv2.COLOR_BGR2RGB)
-        else:
-            doc = cv2.imread(document)
-            if doc is None:
-                err.FILE_READ_FAIL.popup(document_name)
-                return None
-
-        ratio = doc.shape[1]/doc.shape[0]
-        doc = self.add_stamp(
-            doc, qr_stamp, stamp_ratio=self.stamp_ratio)
+            err.QR_ERROR.popup(get_file_name(excel_document_path))
+            return None
+        try:
+            pages = convert_from_path(document_abs_path, dpi=400)
+        except Image.DecompressionBombError:
+            pages = convert_from_path(document_abs_path)
+        except:
+            return None
+        # stamp only first page
+        doc = np.array(pages[0])
+        doc = cv2.cvtColor(doc, cv2.COLOR_BGR2RGB)
+        doc = self.add_stamp(doc, qr_stamp, stamp_ratio=stamp_ratio, step_ratio=self.step_ratio)
         doc = cv2.cvtColor(doc, cv2.COLOR_RGB2BGR)
+        ratio = doc.shape[1]/doc.shape[0]
         page = Image.fromarray(doc)
         page = page.resize((int(size*ratio), size))
         img = ImageTk.PhotoImage(page)
@@ -236,19 +221,19 @@ class StampBot:
             return None
 
     def is_valid_invocie(self, document_abs_path):
-        document_name = document_abs_path.split("/")[-1]
+        document_name = get_file_name(document_abs_path)
         if self.xlsx_pattern.match(document_name):
             return True
         return False
 
-    def check_directory(self):
+    def check_directory(self, dir_path):
         documents = list()
-        if self.dir_path is None or len(self.dir_path) == 0:
+        if dir_path is None or len(dir_path) == 0:
             warn.CHOOSE_DIR.popup()
             return None
         try:
-            for document in os.listdir(self.dir_path):
-                document_abs_path = os.path.join(self.dir_path, document)
+            for document in os.listdir(dir_path):
+                document_abs_path = Path(dir_path) / document
                 if self.is_valid_invocie(document_abs_path):
                     documents.append(document_abs_path)
         except FileNotFoundError as e:
