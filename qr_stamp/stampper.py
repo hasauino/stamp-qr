@@ -1,8 +1,7 @@
 import base64
-import csv
 import os
 import re
-from os import mkdir, path
+from os import mkdir
 from pathlib import Path
 from random import randint
 
