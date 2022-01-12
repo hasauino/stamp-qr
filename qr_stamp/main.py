@@ -11,7 +11,6 @@ from tkinter.filedialog import askdirectory
 from ttkthemes import ThemedTk
 
 from qr_stamp.stampper import StampBot
-from qr_stamp import configs
 
 PREVIEW_ASPECT_RATIO = 1.4142
 WIDTH = 560
