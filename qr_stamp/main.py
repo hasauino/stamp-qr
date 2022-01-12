@@ -1,18 +1,20 @@
 #!/usr/bin/python3
 
+import os
+import threading
 import tkinter as tk
+from sys import platform
 from tkinter import ttk
 from tkinter.filedialog import askdirectory
-from qr_stamp.stampper import StampBot
-import threading
+
 from ttkthemes import ThemedTk
-import os
-from sys import platform
+
 from qr_stamp.msgs import error_msgs as err
+from qr_stamp.stampper import StampBot
 
 
-def csv_chooser_event():
-    text = csv_path_field.get()
+def dir_chooser_event():
+    text = path_field.get()
     selected = askdirectory()
     if not len(selected) == 0:
         csv_path_field.delete(first=0, last=len(text))

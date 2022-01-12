@@ -2,5 +2,6 @@
 pyinstaller
 flake8
 yapf
+isort
 # ipython for interactive testing
 ipython==7.0.0

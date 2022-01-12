@@ -1,6 +1,7 @@
-import win32com.client as win32
-import tempfile
 import os
+import tempfile
+
+import win32com.client as win32
 
 
 def generate_pdf_and_read_data(document_path):

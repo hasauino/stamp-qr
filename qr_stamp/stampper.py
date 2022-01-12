@@ -1,19 +1,21 @@
+import base64
+import csv
+import os
+import re
+from os import mkdir, path
+from random import randint
+
 import cv2
 import numpy as np
-import os
-import csv
-import base64
 import qrcode
 from pdf2image import convert_from_path
 from PIL import Image, ImageTk
-from os import mkdir, path
-import re
-from qr_stamp.msgs import error_msgs as err
-from random import randint
-from qr_stamp.msgs import warning_msgs as warn
-from qr_stamp.msgs import info_msgs as info
+
 from qr_stamp.msgs import WarningMsg
+from qr_stamp.msgs import error_msgs as err
 from qr_stamp.msgs import generate_report
+from qr_stamp.msgs import info_msgs as info
+from qr_stamp.msgs import warning_msgs as warn
 from qr_stamp.utils import generate_pdf_and_read_data
 
 
