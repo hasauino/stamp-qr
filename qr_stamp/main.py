@@ -74,8 +74,8 @@ if __name__ == '__main__':
     root.option_add('*Dialog.msg.font', 'Helvetica 11')
     root.configure(bg=BG_COLOR)
     if platform == "win32":
-        dir_path = os.path.dirname(os.path.realpath(__file__))
-        root.wm_iconbitmap(dir_path+'/icon.ico')
+        dir_path = Path(os.path.dirname(os.path.realpath(__file__)))
+        root.wm_iconbitmap(str(dir_path / 'icon.ico'))
     left = ttk.Frame(root)
     left.grid(column=0, row=0)
     fileschooser_frame = ttk.Frame(left)
