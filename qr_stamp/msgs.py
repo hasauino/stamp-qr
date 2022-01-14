@@ -48,6 +48,8 @@ class error_msgs:
     QR_ERROR = ErrorMsg(title="QR Generation Error",
                         body=("Could not generate QR stamp image for the"
                               " following file: \n"))
+    READ_ERROR = ErrorMsg(title="QR Generation Error",
+                        body=("Could not read the PDF file that was generated from the following Excel sheet: \n:"))                              
 
 
 class warning_msgs:

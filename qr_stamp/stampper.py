@@ -16,8 +16,7 @@ from qr_stamp.msgs import error_msgs as err
 from qr_stamp.msgs import generate_report
 from qr_stamp.msgs import info_msgs as info
 from qr_stamp.msgs import warning_msgs as warn
-from qr_stamp.utils import generate_pdf_and_read_data
-from qr_stamp.utils import get_file_name
+from qr_stamp.utils import generate_pdf_and_read_data, get_file_name
 
 
 class EncodingError(Exception):
@@ -205,6 +204,7 @@ class StampBot:
         except Image.DecompressionBombError:
             pages = convert_from_path(document_abs_path)
         except:
+            err.READ_ERROR(document_abs_path)
             return None
         # stamp only first page
         doc = np.array(pages[0])
