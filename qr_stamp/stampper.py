@@ -17,7 +17,7 @@ from qr_stamp.msgs import generate_report
 from qr_stamp.msgs import info_msgs as info
 from qr_stamp.msgs import warning_msgs as warn
 from qr_stamp.utils import generate_pdf_and_read_data
-from utils import get_file_name
+from qr_stamp.utils import get_file_name
 
 
 class EncodingError(Exception):
@@ -32,7 +32,7 @@ class StampBot:
     def __init__(self, progress_bar, popup_logger, step_ratio=0.1):
         self.progress_bar = progress_bar
         self.step_ratio = step_ratio
-        xlsx_re = r'.*\.xlsx'
+        xlsx_re = r'[\w\d]+.*\.xlsx'
         self.xlsx_pattern = re.compile(xlsx_re, re.I)
         self.print = popup_logger
 
@@ -145,24 +145,25 @@ class StampBot:
                 return None               
         for i, excel_document_path in enumerate(documents):
             document_abs_path, data = generate_pdf_and_read_data(excel_document_path)
-            document_name = get_file_name(document_abs_path)
+            document_name = get_file_name(document_abs_path, with_extension=False)
+            document_name_with_xlsx = "{}.xlsx".format(document_name)
             try:
                 qr_stamp = self.generate_qr(data)
             except EncodingError:
-                skipped_documents["encoding_error"].append(document_name)
+                skipped_documents["encoding_error"].append(document_name_with_xlsx)
                 skipped_total += 1
                 continue
             except QRGenerationError:
                 skipped_documents["qr_generation_error"].append(
-                    document_name)
+                    document_name_with_xlsx)
                 skipped_total += 1
                 continue
             try:
                 pages = convert_from_path(document_abs_path, dpi=400)
             except Image.DecompressionBombError:
                 pages = convert_from_path(document_abs_path)
-            except:
-                skipped_documents["read_error"].append(document_name)
+            except Exception as e:
+                skipped_documents["read_error"].append(document_name_with_xlsx)
                 skipped_total += 1
                 continue
             # stamp only first page
@@ -171,7 +172,7 @@ class StampBot:
             doc = self.add_stamp(doc, qr_stamp, stamp_ratio=stamp_ratio, step_ratio=self.step_ratio)
             doc = cv2.cvtColor(doc, cv2.COLOR_RGB2BGR)
             stamped_page = Image.fromarray(doc)
-            output_path = out_dir / "{}.pdf".format(Path(document_name).stem)
+            output_path = out_dir / "{}.pdf".format(document_name)
             stamped_page.save(output_path,
                               save_all=True,
                               append_images=pages[1:])
