@@ -204,7 +204,7 @@ class StampBot:
         except Image.DecompressionBombError:
             pages = convert_from_path(document_abs_path)
         except:
-            err.READ_ERROR(document_abs_path)
+            err.READ_ERROR.popup(excel_document_path)
             return None
         # stamp only first page
         doc = np.array(pages[0])
