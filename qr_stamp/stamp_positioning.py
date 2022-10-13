@@ -1,10 +1,11 @@
 from tempfile import template
+
 import cv2
+import numpy as np
+import qrcode
 from numpy.core.numeric import ones_like
 from pdf2image import convert_from_path
 from PIL import Image
-import qrcode
-import numpy as np
 
 
 class PDF2ImageConversionError(Exception):

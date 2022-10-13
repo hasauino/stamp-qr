@@ -4,3 +4,4 @@ pdf2image~=1.14
 Pillow~=8.1
 ttkthemes~=3.2
 qrcode~=7.3
+pywin32

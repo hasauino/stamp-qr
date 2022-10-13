@@ -1,19 +1,22 @@
+import base64
+import os
+import re
+from os import mkdir
+from pathlib import Path
+from random import randint
+
 import cv2
 import numpy as np
-import os
-import csv
-import base64
 import qrcode
 from pdf2image import convert_from_path
 from PIL import Image, ImageTk
-from os import mkdir, path
-import re
-from qr_stamp.msgs import error_msgs as err
-from random import randint
-from qr_stamp.msgs import warning_msgs as warn
-from qr_stamp.msgs import info_msgs as info
+
 from qr_stamp.msgs import WarningMsg
+from qr_stamp.msgs import error_msgs as err
 from qr_stamp.msgs import generate_report
+from qr_stamp.msgs import info_msgs as info
+from qr_stamp.msgs import warning_msgs as warn
+from qr_stamp.utils import generate_pdf_and_read_data, get_file_name
 
 
 class EncodingError(Exception):
@@ -25,33 +28,12 @@ class QRGenerationError(Exception):
 
 
 class StampBot:
-    def __init__(self, progress_bar):
+    def __init__(self, progress_bar, popup_logger, step_ratio=0.1):
         self.progress_bar = progress_bar
-        self.stamp_ratio = 0.2
-        self.step_ratio = 0.1
-        self.preview_size = 600
-        self.stamp_path = None
-        self.stamp = None
-        self.ready = False
-        pdf_re = r'.*\.pdf'
-        img_re = r'.*\.(bmp|dib|jpeg|jpg|jpe|jp2|png|webp|pbm|pgm|ppm|pxm|pnm|pfm|sr|ras|tiff|tif|exr|hdr|pic)'
-        self.pdf_pattern = re.compile(pdf_re, re.I)
-        self.img_pattern = re.compile(img_re, re.I)
-        self.invoice_pattern = re.compile("MENA\d+")
-        self.file_pattern = re.compile("(%s|%s)" % (pdf_re, img_re))
-        self.dir_path = None
-        self._csv_path = None
-        self.csv_file_name = None
-
-    @property
-    def csv_path(self):
-        return self._csv_path
-
-    @csv_path.setter
-    def csv_path(self, path):
-        self._csv_path = path
-        self.csv_file_name = self._csv_path.split("/")[-1]
-        self.dir_path = self._csv_path[:-len(self.csv_file_name)]
+        self.step_ratio = step_ratio
+        xlsx_re = r'[\w\d]+.*\.xlsx'
+        self.xlsx_pattern = re.compile(xlsx_re, re.I)
+        self.print = popup_logger
 
     @staticmethod
     def add_stamp(doc, stamp, stamp_ratio=0.2, step_ratio=0.1):
@@ -126,15 +108,11 @@ class StampBot:
         base64_message = base64_bytes.decode('ascii')
         return base64_message
 
-    def generate_qr(self, document_name, data):
-        indx_start, indx_end = self.invoice_pattern.match(
-            document_name).span()
-        document_key = document_name[indx_start:indx_end]
-        if document_key not in data:
-            raise KeyError
+    @staticmethod
+    def generate_qr(data):
         try:
-            qr_raw_text = self.get_invocie_text(data[document_key])
-            qr_encoded_text = self.encode(qr_raw_text)
+            qr_raw_text = StampBot.get_invocie_text(data)
+            qr_encoded_text = StampBot.encode(qr_raw_text)
         except:
             raise EncodingError
         try:
@@ -145,7 +123,7 @@ class StampBot:
             raise QRGenerationError
         return qr
 
-    def stamp_all(self):
+    def stamp_all(self, dir_path, stamp_ratio):
         skipped_total = 0
         skipped_documents = {
             "key_error": [],
@@ -154,64 +132,49 @@ class StampBot:
             "read_error": [],
         }
         self.progress_bar['value'] = 5
-        documents, data = self._check_directory()
-        if data is None or documents is None:
+        documents = self.check_directory(dir_path)
+        if documents is None:
             return None
-        out_dir = self.dir_path + "out_docs"
-        if not path.exists(out_dir):
+        out_dir = Path(dir_path) / "out_docs"
+        if not out_dir.exists():
             try:
                 mkdir(out_dir)
             except:
                 err.MKDIR_FAIL.popup()
-                return None
-
-        for i, document in enumerate(documents):
-            document_name = document.split("/")[-1]
+                return None               
+        for i, excel_document_path in enumerate(documents):
+            document_abs_path, data = generate_pdf_and_read_data(excel_document_path)
+            document_name = get_file_name(document_abs_path, with_extension=False)
+            document_name_with_xlsx = "{}.xlsx".format(document_name)
             try:
-                qr_stamp = self.generate_qr(document_name, data)
-            except KeyError:
-                skipped_documents["key_error"].append(document_name)
-                skipped_total += 1
-                continue
+                qr_stamp = self.generate_qr(data)
             except EncodingError:
-                skipped_documents["encoding_error"].append(document_name)
+                skipped_documents["encoding_error"].append(document_name_with_xlsx)
                 skipped_total += 1
                 continue
             except QRGenerationError:
                 skipped_documents["qr_generation_error"].append(
-                    document_name)
+                    document_name_with_xlsx)
                 skipped_total += 1
                 continue
-            # if document is a PDF file (could have multiple pages)
-            if self.pdf_pattern.match(document_name):
-                try:
-                    pages = convert_from_path(document, dpi=400)
-                except Image.DecompressionBombError:
-                    pages = convert_from_path(document)
-                except:
-                    skipped_documents["read_error"].append(document_name)
-                    skipped_total += 1
-                    continue
-                # stamp only first page
-                doc = np.array(pages[0])
-                doc = cv2.cvtColor(doc, cv2.COLOR_BGR2RGB)
-                doc = self.add_stamp(doc, qr_stamp,
-                                     stamp_ratio=self.stamp_ratio)
-                doc = cv2.cvtColor(doc, cv2.COLOR_RGB2BGR)
-                stamped_page = Image.fromarray(doc)
-                stamped_page.save(out_dir+"/"+document_name[:-4]+".pdf",
-                                  save_all=True,
-                                  append_images=pages[1:])
-            else:
-                doc = cv2.imread(document)
-                if doc is None:
-                    skipped_documents["read_error"].append(document_name)
-                    skipped_total += 1
-                    continue
-                doc = self.add_stamp(
-                    doc, qr_stamp, stamp_ratio=self.stamp_ratio)
-                cv2.imwrite(out_dir+"/"+document_name, doc)
-
+            try:
+                pages = convert_from_path(document_abs_path, dpi=400)
+            except Image.DecompressionBombError:
+                pages = convert_from_path(document_abs_path)
+            except Exception as e:
+                skipped_documents["read_error"].append(document_name_with_xlsx)
+                skipped_total += 1
+                continue
+            # stamp only first page
+            doc = np.array(pages[0])
+            doc = cv2.cvtColor(doc, cv2.COLOR_BGR2RGB)
+            doc = self.add_stamp(doc, qr_stamp, stamp_ratio=stamp_ratio, step_ratio=self.step_ratio)
+            doc = cv2.cvtColor(doc, cv2.COLOR_RGB2BGR)
+            stamped_page = Image.fromarray(doc)
+            output_path = out_dir / "{}.pdf".format(document_name)
+            stamped_page.save(output_path,
+                              save_all=True,
+                              append_images=pages[1:])
             self.progress_bar['value'] = (i+1.0)/len(documents)*100.0
         if skipped_total > 0:
             report = generate_report(
@@ -221,44 +184,34 @@ class StampBot:
         else:
             info.SUCCESS.popup()
 
-    def preview(self, size):
-        documents, data = self._check_directory()
-        if data is None or documents is None:
+    def preview(self, dir_path, stamp_ratio, size):
+        documents = self.check_directory(dir_path)
+        if documents is None:
             return None
         rand_index = randint(0, len(documents)-1)
-        document = documents[rand_index]
-        document_name = document.split("/")[-1]
+        excel_document_path = documents[rand_index]
+        document_abs_path, data = generate_pdf_and_read_data(excel_document_path)
         try:
-            qr_stamp = self.generate_qr(document_name, data)
-        except KeyError:
-            err.KEY_ERROR.popup(document_name)
-            return
+            qr_stamp = self.generate_qr(data)
         except EncodingError:
-            err.ENCODE_ERROR.popup(document_name)
-            return
+            err.ENCODE_ERROR.popup(get_file_name(excel_document_path))
+            return None
         except QRGenerationError:
-            err.QR_ERROR.popup(document_name)
-            return
-        if self.pdf_pattern.match(document_name):
-            try:
-                page = convert_from_path(document, dpi=400)[0]
-            except Image.DecompressionBombError:
-                page = convert_from_path(document)[0]
-            except:
-                err.FILE_READ_FAIL.popup(document_name)
-                return None
-            doc = np.array(page)
-            doc = cv2.cvtColor(doc, cv2.COLOR_BGR2RGB)
-        else:
-            doc = cv2.imread(document)
-            if doc is None:
-                err.FILE_READ_FAIL.popup(document_name)
-                return None
-
-        ratio = doc.shape[1]/doc.shape[0]
-        doc = self.add_stamp(
-            doc, qr_stamp, stamp_ratio=self.stamp_ratio)
+            err.QR_ERROR.popup(get_file_name(excel_document_path))
+            return None
+        try:
+            pages = convert_from_path(document_abs_path, dpi=400)
+        except Image.DecompressionBombError:
+            pages = convert_from_path(document_abs_path)
+        except:
+            err.READ_ERROR.popup(excel_document_path)
+            return None
+        # stamp only first page
+        doc = np.array(pages[0])
+        doc = cv2.cvtColor(doc, cv2.COLOR_BGR2RGB)
+        doc = self.add_stamp(doc, qr_stamp, stamp_ratio=stamp_ratio, step_ratio=self.step_ratio)
         doc = cv2.cvtColor(doc, cv2.COLOR_RGB2BGR)
+        ratio = doc.shape[1]/doc.shape[0]
         page = Image.fromarray(doc)
         page = page.resize((int(size*ratio), size))
         img = ImageTk.PhotoImage(page)
@@ -268,56 +221,25 @@ class StampBot:
             return None
 
     def is_valid_invocie(self, document_abs_path):
-        document_name = document_abs_path.split("/")[-1]
-        if self.file_pattern.match(document_name) and self.invoice_pattern.match(document_name):
+        document_name = get_file_name(document_abs_path)
+        if self.xlsx_pattern.match(document_name):
             return True
         return False
 
-    def _check_directory(self):
+    def check_directory(self, dir_path):
         documents = list()
-        if self.dir_path is None or len(self.dir_path) == 0:
-            warn.CHOOSE_CSV.popup()
-            return None, None
+        if dir_path is None or len(dir_path) == 0:
+            warn.CHOOSE_DIR.popup()
+            return None
         try:
-            for document in os.listdir(self.dir_path):
-                document_abs_path = os.path.join(self.dir_path, document)
+            for document in os.listdir(dir_path):
+                document_abs_path = Path(dir_path) / document
                 if self.is_valid_invocie(document_abs_path):
                     documents.append(document_abs_path)
         except FileNotFoundError as e:
             err.Error.popup(e)
-            return None, None
+            return None
         if len(documents) == 0:
             err.NO_FILES.popup()
-            return None, None
-
-        if not path.exists(self.csv_path):
-            err.CSV_NOT_FOUND.popup()
-            return None, None
-
-        data = dict()
-        try:
-            with open(self.csv_path, newline='') as csvfile:
-                file_reader = csv.reader(
-                    csvfile, delimiter=',', quotechar='|')
-                for row in file_reader:
-                    if self.invoice_pattern.match(row[-1]) is not None:
-                        data[row[-1]] = {"company_name": row[0],
-                                         "vat_number": row[1],
-                                         "date": row[2],
-                                         "total_amount": row[3],
-                                         "vat_amount": row[4]
-                                         }
-
-        except FileNotFoundError:
-            err.CSV_OPEN.popup()
-            return None, None
-
-        except IndexError:
-            err.CSV_FORMAT.popup()
-            return None, None
-
-        except Exception as e:
-            err.Error.popup(e)
-            return None, None
-
-        return documents, data
+            return None
+        return documents
