@@ -69,12 +69,12 @@ class StampBot:
 
     @staticmethod
     def format_number(num_string):
-        return "{:,.2f}".format(float(num_string))
+        return "{:.2f}".format(float(num_string))
 
     @staticmethod
     def get_invocie_text(invoice_dict):
         company_name = invoice_dict["company_name"]
-        vat_number = invoice_dict["vat_number"]
+        vat_number = invoice_dict["vat_number"].split(".")[0]
         vat_amount = "{:.2f}".format(float(invoice_dict["vat_amount"]))
         total = StampBot.format_number(invoice_dict["total_amount"])
         day, month, year = invoice_dict["date"].split("-")
