@@ -10,14 +10,13 @@ class InfoMsg:
         self.body = body
         self.type = MsgType.info
 
-    def popup(self, object_to_append=""):
-        text = str(object_to_append)
+    def popup(self, **kwargs):
         if self.type == MsgType.info:
-            messagebox.showinfo(self.title, self.body+text)
+            messagebox.showinfo(self.title, self.body.format(**kwargs))
         elif self.type == MsgType.warning:
-            messagebox.showwarning(self.title, self.body+text)
+            messagebox.showwarning(self.title, self.body.format(**kwargs))
         elif self.type == MsgType.error:
-            messagebox.showerror(self.title, self.body+text)
+            messagebox.showerror(self.title, self.body.format(**kwargs))
 
 
 class ErrorMsg(InfoMsg):
@@ -39,17 +38,19 @@ class error_msgs:
                             body="Could not preview image!")
     FILE_READ_FAIL = ErrorMsg(title="Documents Error",
                               body="Could not read document: ")
-    MKDIR_FAIL = ErrorMsg(title="Output Directory Error",
-                          body="Could not create output directory")
     Error = ErrorMsg(title="Error")
     ENCODE_ERROR = ErrorMsg(title="Data Format Error",
                             body=("Data format in Excel sheet is wrong for the"
-                                  " following file: \n"))
+                                  " following file:\n{file_path}"))
     QR_ERROR = ErrorMsg(title="QR Generation Error",
                         body=("Could not generate QR stamp image for the"
-                              " following file: \n"))
+                              " following file:\n{file_path}"))
     READ_ERROR = ErrorMsg(title="QR Generation Error",
-                        body=("Could not read the PDF file that was generated from the following Excel sheet: \n:"))                              
+                          body=("Could not read the PDF file that was generated from the following Excel sheet:\n{file_path}"))
+    CONFIG_NOT_FOUND = ErrorMsg(title="File Not Found",
+                                body="Config CSV file not found in:\n{file_path}")
+    CONFIG_HEADER_FORMAT_ERROR = ErrorMsg(title="File Not Found",
+                                          body="Config CSV file not found in:\n{file_path}")
 
 
 class warning_msgs:
@@ -60,7 +61,7 @@ class warning_msgs:
                                   " the documents to be stamped are placed"
                                   " next to it in the same directory"))
     CHOOSE_DIR = WarningMsg(
-        title="Choose Directory", body=("Please choose a directory"))                                  
+        title="Choose Directory", body=("Please choose a directory"))
 
 
 class info_msgs:

@@ -1,4 +1,3 @@
-import base64
 import os
 import re
 from os import mkdir
@@ -7,11 +6,13 @@ from random import randint
 
 import cv2
 import numpy as np
-import qrcode
+import win32com.client as win32
 from pdf2image import convert_from_path
 from PIL import Image, ImageTk
 
-from qr_stamp.msgs import WarningMsg
+from exceptions import EncodingError, QRGenerationError
+from invoice import Invoice, get_invoices_data
+from qr_stamp.msgs import ErrorMsg, WarningMsg
 from qr_stamp.msgs import error_msgs as err
 from qr_stamp.msgs import generate_report
 from qr_stamp.msgs import info_msgs as info
@@ -19,23 +20,17 @@ from qr_stamp.msgs import warning_msgs as warn
 from qr_stamp.utils import generate_pdf_and_read_data, get_file_name
 
 
-class EncodingError(Exception):
-    pass
-
-
-class QRGenerationError(Exception):
-    pass
-
-
 class StampBot:
     def __init__(self, gui, step_ratio=0.1):
         self.gui = gui
         self.step_ratio = step_ratio
-        xlsx_re = r'[\w\d]+.*\.xlsx'
+        xlsx_re = r'[\w\d]+.*\.xlsx?'
         self.xlsx_pattern = re.compile(xlsx_re, re.I)
         self.print = self.gui.pop_up
 
-    def stamp_all(self, dir_path, stamp_ratio):
+    def stamp_all(self):
+        dir_path = self.gui.excel_dir_chooser.get()
+        config_path = self.gui.config_chooser.get()
         skipped_total = 0
         skipped_documents = {
             "key_error": [],
@@ -45,62 +40,31 @@ class StampBot:
         }
         self.gui.progress_bar['value'] = 5
         documents = self.check_directory(dir_path)
+        invoices_data = get_invoices_data(config_path)
         if documents is None:
             return None
-        out_dir = Path(dir_path) / "out_docs"
-        if not out_dir.exists():
-            try:
-                mkdir(out_dir)
-            except:
-                err.MKDIR_FAIL.popup()
-                return None
+        if invoices_data is None:
+            return None
+        excel = win32.gencache.EnsureDispatch('Excel.Application')
         for i, excel_document_path in enumerate(documents):
-            document_abs_path, data = generate_pdf_and_read_data(
-                excel_document_path)
             document_name = get_file_name(
-                document_abs_path, with_extension=False)
-            document_name_with_xlsx = "{}.xlsx".format(document_name)
+                excel_document_path, with_extension=False)
             try:
-                qr_stamp = self.generate_qr(data)
+                invoice = Invoice(invoices_data[document_name])
+                invoice.insert_to_excel_file(excel, excel_document_path)
             except EncodingError:
-                skipped_documents["encoding_error"].append(
-                    document_name_with_xlsx)
+                skipped_documents["encoding_error"].append(excel_document_path)
                 skipped_total += 1
                 continue
             except QRGenerationError:
                 skipped_documents["qr_generation_error"].append(
-                    document_name_with_xlsx)
+                    excel_document_path)
                 skipped_total += 1
                 continue
-            try:
-                pages = convert_from_path(document_abs_path, dpi=400)
-            except Image.DecompressionBombError:
-                pages = convert_from_path(document_abs_path)
-            except Exception as e:
-                skipped_documents["read_error"].append(document_name_with_xlsx)
-                skipped_total += 1
-                continue
-            # stamp only first page
-            doc = np.array(pages[0])
-            doc = cv2.cvtColor(doc, cv2.COLOR_BGR2RGB)
-            doc = self.add_stamp(
-                doc, qr_stamp, stamp_ratio=stamp_ratio, step_ratio=self.step_ratio)
-            doc = cv2.cvtColor(doc, cv2.COLOR_RGB2BGR)
-            stamped_page = Image.fromarray(doc)
-            output_path = out_dir / "{}.pdf".format(document_name)
-            stamped_page.save(output_path,
-                              save_all=True,
-                              append_images=pages[1:])
             self.gui.progress_bar['value'] = (i+1.0)/len(documents)*100.0
-        if skipped_total > 0:
-            report = generate_report(
-                skipped_documents, skipped_total, len(documents))
-            error = WarningMsg(title="Skipped some documents", body=report)
-            error.popup()
-        else:
-            info.SUCCESS.popup()
 
-    def preview(self, dir_path, stamp_ratio, size):
+    def preview(self, dir_path, size):
+        return
         documents = self.check_directory(dir_path)
         if documents is None:
             return None
@@ -142,59 +106,7 @@ class StampBot:
     def add_stamp():
         pass
 
-    @staticmethod
-    def generate_qr(data):
-        try:
-            qr_raw_text = StampBot.get_invocie_text(data)
-            qr_encoded_text = StampBot.encode(qr_raw_text)
-        except:
-            raise EncodingError
-        try:
-            qr_pil_img = qrcode.make(qr_encoded_text)
-            gray_qr = np.uint8(np.array(qr_pil_img) * 255)
-            qr = cv2.cvtColor(gray_qr, cv2.COLOR_GRAY2RGB)
-        except:
-            raise QRGenerationError
-        return qr
-
-    @staticmethod
-    def get_invocie_text(invoice_dict):
-        company_name = invoice_dict["company_name"]
-        vat_number = invoice_dict["vat_number"].split(".")[0]
-        vat_amount = StampBot.format_number(invoice_dict["vat_amount"])
-        total = StampBot.format_number(invoice_dict["total_amount"])
-        day, month, year = invoice_dict["date"].split("-")
-        date = "{yyyy}-{mm}-{dd}".format(yyyy=year,
-                                         mm=month, dd=day)
-        time = "12:00:00.000"
-        return b''.join([
-            b'\x01',
-            int.to_bytes(len(company_name), 1, 'big'),
-            company_name.encode(),
-            b'\x02',
-            int.to_bytes(len(vat_number), 1, 'big'),
-            vat_number.encode(),
-            b'\x03',
-            int.to_bytes(len(date+time+'TZ'), 1, 'big'),
-            date.encode(),
-            b'T',
-            time.encode(),
-            b'Z',
-            b'\x05',
-            int.to_bytes(len(vat_amount), 1, 'big'),
-            vat_amount.encode(),
-            b'\x04',
-            int.to_bytes(len(total), 1, 'big'),
-            total.encode(),
-        ])
-
-    @staticmethod
-    def encode(message_bytes):
-        base64_bytes = base64.b64encode(message_bytes)
-        base64_message = base64_bytes.decode('ascii')
-        return base64_message
-
-    def is_valid_invocie(self, document_abs_path):
+    def is_valid_invoice(self, document_abs_path):
         document_name = get_file_name(document_abs_path)
         if self.xlsx_pattern.match(document_name):
             return True
@@ -208,7 +120,7 @@ class StampBot:
         try:
             for document in os.listdir(dir_path):
                 document_abs_path = Path(dir_path) / document
-                if self.is_valid_invocie(document_abs_path):
+                if self.is_valid_invoice(document_abs_path):
                     documents.append(document_abs_path)
         except FileNotFoundError as e:
             err.Error.popup(e)
