@@ -2,22 +2,14 @@ import os
 import re
 from os import mkdir
 from pathlib import Path
-from random import randint
 
-import cv2
-import numpy as np
 import win32com.client as win32
-from pdf2image import convert_from_path
-from PIL import Image, ImageTk
 
-from exceptions import EncodingError, QRGenerationError
-from invoice import Invoice, get_invoices_data
-from qr_stamp.msgs import ErrorMsg, WarningMsg
+from qr_stamp.exceptions import EncodingError, QRGenerationError
+from qr_stamp.invoice import Invoice, get_invoices_data
 from qr_stamp.msgs import error_msgs as err
-from qr_stamp.msgs import generate_report
-from qr_stamp.msgs import info_msgs as info
 from qr_stamp.msgs import warning_msgs as warn
-from qr_stamp.utils import generate_pdf_and_read_data, get_file_name
+from qr_stamp.utils import get_file_name
 
 
 class StampBot:
@@ -65,42 +57,6 @@ class StampBot:
 
     def preview(self, dir_path, size):
         return
-        documents = self.check_directory(dir_path)
-        if documents is None:
-            return None
-        rand_index = randint(0, len(documents)-1)
-        excel_document_path = documents[rand_index]
-        document_abs_path, data = generate_pdf_and_read_data(
-            excel_document_path)
-        try:
-            qr_stamp = self.generate_qr(data)
-        except EncodingError:
-            err.ENCODE_ERROR.popup(get_file_name(excel_document_path))
-            return None
-        except QRGenerationError:
-            err.QR_ERROR.popup(get_file_name(excel_document_path))
-            return None
-        try:
-            pages = convert_from_path(document_abs_path, dpi=400)
-        except Image.DecompressionBombError:
-            pages = convert_from_path(document_abs_path)
-        except:
-            err.READ_ERROR.popup(excel_document_path)
-            return None
-        # stamp only first page
-        doc = np.array(pages[0])
-        doc = cv2.cvtColor(doc, cv2.COLOR_BGR2RGB)
-        doc = self.add_stamp(
-            doc, qr_stamp, stamp_ratio=stamp_ratio, step_ratio=self.step_ratio)
-        doc = cv2.cvtColor(doc, cv2.COLOR_RGB2BGR)
-        ratio = doc.shape[1]/doc.shape[0]
-        page = Image.fromarray(doc)
-        page = page.resize((int(size*ratio), size))
-        img = ImageTk.PhotoImage(page)
-        if img:
-            return img
-        else:
-            return None
 
     @staticmethod
     def add_stamp():

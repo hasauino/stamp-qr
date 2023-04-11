@@ -6,11 +6,10 @@ from pathlib import Path
 import cv2
 import numpy as np
 import qrcode
-import win32com.client as win32
 
-from exceptions import EncodingError, QRGenerationError
+from qr_stamp.exceptions import EncodingError, QRGenerationError
 from qr_stamp.msgs import ErrorMsg
-from utils import resize_to_width
+from qr_stamp.utils import resize_to_width
 
 
 def get_invoices_data(csv_path):
