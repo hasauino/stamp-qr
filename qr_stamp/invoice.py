@@ -7,15 +7,19 @@ import cv2
 import numpy as np
 import qrcode
 
-from qr_stamp.exceptions import EncodingError, QRGenerationError
-from qr_stamp.msgs import ErrorMsg
+from qr_stamp.exceptions import EncodingError, QRGenerationError, OpenInvoiceError
+from qr_stamp.msgs import error, warn
 from qr_stamp.utils import resize_to_width
 
 
 def get_invoices_data(csv_path):
+    if len(csv_path) == 0:
+        warn(title="Choose CSV",
+             body=f"Please choose a configuration CSV file")
+        return None
     if not Path(csv_path).exists():
-        ErrorMsg(title="File Not Found",
-                 body=f"Config CSV file not found in:\n{csv_path}").popup()
+        error(title="File Not Found",
+              body=f"Config CSV file not found in:\n{csv_path}")
         return None
     header_expected = ['COMPANY', 'VAT NUM',
                        'DATE', 'VAT', 'TOTAL', 'INV', 'QR']
@@ -24,17 +28,17 @@ def get_invoices_data(csv_path):
         reader = csv.reader(csv_file)
         header = [label.lower().strip() for label in next(reader)]
         if len(header) != len(header_expected):
-            ErrorMsg(title="Wrong CSV Config format",
-                     body=f"CSV Configuration file should have {len(header_expected)} columns").popup()
+            error(title="Wrong CSV Config format",
+                  body=f"CSV Configuration file should have {len(header_expected)} columns")
             return None
         if not header == [label.lower() for label in header_expected]:
-            ErrorMsg(title="Wrong CSV Config format",
-                     body=f"Header Columns should be: {header_expected}").popup()
+            error(title="Wrong CSV Config format",
+                  body=f"Header Columns should be: {header_expected}")
             return None
         for i, row in enumerate(reader):
             if len(row) != len(header_expected):
-                ErrorMsg(title="File Not Found",
-                         body=f"CSV Configuration file row number {i+2} should have {len(header_expected)} columns").popup()
+                error(title="File Not Found",
+                      body=f"CSV Configuration file row number {i+2} should have {len(header_expected)} columns")
                 return None
             data[row[5]] = row
     return data
@@ -59,9 +63,11 @@ class Invoice:
         tmp_img_path = Path(tmp_dir) / "stamp.png"
         qr_img = self.generate_qr()
         cv2.imwrite(str(tmp_img_path), qr_img)
-
-        wb = excel.Workbooks.Open(abs_path)
-        sheet_name = [sh.Name for sh in wb.Sheets][0]
+        try:
+            wb = excel.Workbooks.Open(abs_path)
+        except:
+            raise OpenInvoiceError
+        sheet_name = [sh.Name for sh in wb.Sheets][0]  # could raise IndexError
         ws = wb.Worksheets(sheet_name)
         cell = ws.Range(self.qr_cell)
         picture = ws.Pictures().Insert(tmp_img_path)

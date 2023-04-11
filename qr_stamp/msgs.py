@@ -4,84 +4,29 @@ from tkinter import messagebox
 MsgType = Enum('Type', 'info warning error')
 
 
-class InfoMsg:
-    def __init__(self, title="", body="") -> None:
-        self.title = title
-        self.body = body
-        self.type = MsgType.info
-
-    def popup(self, **kwargs):
-        if self.type == MsgType.info:
-            messagebox.showinfo(self.title, self.body.format(**kwargs))
-        elif self.type == MsgType.warning:
-            messagebox.showwarning(self.title, self.body.format(**kwargs))
-        elif self.type == MsgType.error:
-            messagebox.showerror(self.title, self.body.format(**kwargs))
+def error(title="Error", body=""):
+    messagebox.showerror(title, body)
 
 
-class ErrorMsg(InfoMsg):
-    def __init__(self, title="", body=""):
-        InfoMsg.__init__(self, title, body)
-        self.type = MsgType.error
+def warn(title="Warning", body=""):
+    messagebox.showwarning(title, body)
 
 
-class WarningMsg(InfoMsg):
-    def __init__(self, title="", body=""):
-        InfoMsg.__init__(self, title, body)
-        self.type = MsgType.warning
-
-
-class error_msgs:
-    NO_FILES = ErrorMsg(title="Documents Error",
-                        body="No files to stamp in chosen directory!")
-    PREVIEW_FAIL = ErrorMsg(title="Preview Fail",
-                            body="Could not preview image!")
-    FILE_READ_FAIL = ErrorMsg(title="Documents Error",
-                              body="Could not read document: ")
-    Error = ErrorMsg(title="Error")
-    ENCODE_ERROR = ErrorMsg(title="Data Format Error",
-                            body=("Data format in Excel sheet is wrong for the"
-                                  " following file:\n{file_path}"))
-    QR_ERROR = ErrorMsg(title="QR Generation Error",
-                        body=("Could not generate QR stamp image for the"
-                              " following file:\n{file_path}"))
-    READ_ERROR = ErrorMsg(title="QR Generation Error",
-                          body=("Could not read the PDF file that was generated from the following Excel sheet:\n{file_path}"))
-    CONFIG_NOT_FOUND = ErrorMsg(title="File Not Found",
-                                body="Config CSV file not found in:\n{file_path}")
-    CONFIG_HEADER_FORMAT_ERROR = ErrorMsg(title="File Not Found",
-                                          body="Config CSV file not found in:\n{file_path}")
-
-
-class warning_msgs:
-    FAILED_FILES = WarningMsg(
-        title="Skipped some documents", body="")
-    CHOOSE_CSV = WarningMsg(
-        title="Choose CSV", body=("Please choose an CSV file where"
-                                  " the documents to be stamped are placed"
-                                  " next to it in the same directory"))
-    CHOOSE_DIR = WarningMsg(
-        title="Choose Directory", body=("Please choose a directory"))
-
-
-class info_msgs:
-    SUCCESS = InfoMsg(
-        title="Done", body=("Successfully stampped all documents and placed"
-                            " them inside \"out_docs/\" in the same"
-                            " directory as the chosen CSV file."))
+def info(title="Information", body=""):
+    messagebox.showinfo(title, body)
 
 
 def generate_report(skipped_documents, no_skipped, no_docs):
-    report = ("Did not stamp all documents!\n"
-              "Number of documents that were skipped: {}\n"
-              "number of documents "
+    report = ("Did not stamp all Invoices!\n"
+              "Number of Invoices that were skipped: {}\n"
+              "number of Invoices "
               "succeeded: {} \n\n").format(no_skipped, no_docs-no_skipped,)
     if len(skipped_documents["key_error"]) > 0:
         report += "===========\n"
         text = ""
         for doc in skipped_documents["key_error"]:
             text += "\"{}\"\n________\n".format(doc)
-        report += ("Documents that were skipped because "
+        report += ("Invoices that were skipped because "
                    "no associated data is found in the CSV"
                    " file:\n {} \n\n").format(text)
     if len(skipped_documents["encoding_error"]) > 0:
@@ -89,7 +34,7 @@ def generate_report(skipped_documents, no_skipped, no_docs):
         text = ""
         for doc in skipped_documents["encoding_error"]:
             text += "\"{}\"\n________\n".format(doc)
-        report += ("Documents that were skipped because the given invoice"
+        report += ("Invoices that were skipped because the given invoice"
                    " data is not correct (check invoice"
                    " data in the CSV file):\n {}").format(text)
     if len(skipped_documents["qr_generation_error"]) > 0:
@@ -97,14 +42,21 @@ def generate_report(skipped_documents, no_skipped, no_docs):
         text = ""
         for doc in skipped_documents["qr_generation_error"]:
             text += "\"{}\"\n________\n".format(doc)
-        report += ("Documents that were skipped because of a failure"
+        report += ("Invoices that were skipped because of a failure"
                    " in generating the QR image stamp: \n {}").format(text)
+    if len(skipped_documents["invoice_open_error"]) > 0:
+        report += "===========\n"
+        text = ""
+        for doc in skipped_documents["invoice_open_error"]:
+            text += "\"{}\"\n________\n".format(doc)
+        report += ("Invoices that were skipped because of a failure"
+                   " in opening them: \n {}").format(text)
     if len(skipped_documents["read_error"]) > 0:
         report += "===========\n"
         text = ""
         for doc in skipped_documents["read_error"]:
             text += "\"{}\"\n________\n".format(doc)
-        report += ("Documents that were skipped because of failure"
-                   " in reading the invoice file"
+        report += ("Invoices that were skipped because of failure"
+                   " in reading invoice file"
                    " (check file format):\n {}").format(text)
     return report

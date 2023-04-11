@@ -1,14 +1,12 @@
 import os
 import re
-from os import mkdir
 from pathlib import Path
 
 import win32com.client as win32
 
-from qr_stamp.exceptions import EncodingError, QRGenerationError
+from qr_stamp.exceptions import EncodingError, QRGenerationError, OpenInvoiceError
 from qr_stamp.invoice import Invoice, get_invoices_data
-from qr_stamp.msgs import error_msgs as err
-from qr_stamp.msgs import warning_msgs as warn
+from qr_stamp.msgs import error, generate_report, info, warn
 from qr_stamp.utils import get_file_name
 
 
@@ -21,14 +19,16 @@ class StampBot:
         self.print = self.gui.pop_up
 
     def stamp_all(self):
+        self.gui.stop_reset()
         dir_path = self.gui.excel_dir_chooser.get()
         config_path = self.gui.config_chooser.get()
-        skipped_total = 0
+        succeeded = 0
         skipped_documents = {
             "key_error": [],
             "encoding_error": [],
             "qr_generation_error": [],
             "read_error": [],
+            "invoice_open_error": []
         }
         self.gui.progress_bar['value'] = 5
         documents = self.check_directory(dir_path)
@@ -37,30 +37,48 @@ class StampBot:
             return None
         if invoices_data is None:
             return None
-        excel = win32.gencache.EnsureDispatch('Excel.Application')
+        try:
+            excel = win32.gencache.EnsureDispatch('Excel.Application')
+        except Exception:
+            error("Excel Application Error",
+                  ("Could not open Excel application. "
+                   "Possible reasons:\n"
+                   "- Excel is not installed on your machine\n"
+                   "- Excel is already running. Please close all excel workbooks before running the stamper"))
+
         for i, excel_document_path in enumerate(documents):
+            if self.gui.is_stopped():
+                break
             document_name = get_file_name(
                 excel_document_path, with_extension=False)
             try:
                 invoice = Invoice(invoices_data[document_name])
-                invoice.insert_to_excel_file(excel, excel_document_path)
+            except KeyError:
+                skipped_documents["key_error"].append(
+                    excel_document_path)
+                continue
             except EncodingError:
                 skipped_documents["encoding_error"].append(excel_document_path)
-                skipped_total += 1
                 continue
+            try:
+                invoice.insert_to_excel_file(excel, excel_document_path)
             except QRGenerationError:
                 skipped_documents["qr_generation_error"].append(
                     excel_document_path)
-                skipped_total += 1
+                continue
+            except OpenInvoiceError:
+                skipped_documents["invoice_open_error"].append(
+                    excel_document_path)
                 continue
             self.gui.progress_bar['value'] = (i+1.0)/len(documents)*100.0
-
-    def preview(self, dir_path, size):
-        return
-
-    @staticmethod
-    def add_stamp():
-        pass
+            succeeded += 1
+        skipped_total = len(documents) - succeeded
+        if skipped_total == 0:
+            info(title="Done", body=("Successfully stamped all Excel files in place"))
+            return
+        report = generate_report(
+            skipped_documents, skipped_total, len(documents))
+        warn(title="Skipped Some Documents", body=report)
 
     def is_valid_invoice(self, document_abs_path):
         document_name = get_file_name(document_abs_path)
@@ -71,7 +89,7 @@ class StampBot:
     def check_directory(self, dir_path):
         documents = list()
         if dir_path is None or len(dir_path) == 0:
-            warn.CHOOSE_DIR.popup()
+            warn(title="Choose Directory", body="Please choose a directory")
             return None
         try:
             for document in os.listdir(dir_path):
@@ -79,13 +97,15 @@ class StampBot:
                 if self.is_valid_invoice(document_abs_path):
                     documents.append(document_abs_path)
         except FileNotFoundError as e:
-            err.Error.popup(e)
+            error(title="File Not Found",
+                  body=f"File {document} was not found in {document_abs_path}")
             return None
         if len(documents) == 0:
-            err.NO_FILES.popup()
+            error(title="Documents Error",
+                        body="No files to stamp in chosen directory!")
             return None
         return documents
 
-    @staticmethod
+    @ staticmethod
     def format_number(num_string):
         return "{:.2f}".format(float(num_string))

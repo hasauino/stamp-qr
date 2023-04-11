@@ -1,7 +1,0 @@
-{
-    "issuer_cell": "E3",
-    "vat_num_cell": "E10",
-    "vat_amount_cell": "I41",
-    "total_amount_cell": "I24",
-    "date_cell": "I16"
-}
