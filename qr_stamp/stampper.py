@@ -48,7 +48,8 @@ class StampBot:
 
         for i, excel_document_path in enumerate(documents):
             if self.gui.is_stopped():
-                break
+                self.gui.reset_progress()
+                return
             document_name = get_file_name(
                 excel_document_path, with_extension=False)
             try:
@@ -61,7 +62,8 @@ class StampBot:
                 skipped_documents["encoding_error"].append(excel_document_path)
                 continue
             try:
-                invoice.insert_to_excel_file(excel, excel_document_path, self.gui.scale.get())
+                invoice.insert_to_excel_file(
+                    excel, excel_document_path, self.gui.scale.get())
             except QRGenerationError:
                 skipped_documents["qr_generation_error"].append(
                     excel_document_path)
@@ -78,6 +80,50 @@ class StampBot:
             return
         report = generate_report(
             skipped_documents, skipped_total, len(documents))
+        warn(title="Skipped Some Documents", body=report)
+
+    def undo(self):
+        self.gui.stop_reset()
+        dir_path = self.gui.excel_dir_chooser.get()
+        succeeded = 0
+        skipped_documents = []
+        self.gui.progress_bar['value'] = 5
+        documents = self.check_directory(dir_path)
+        if documents is None:
+            return None
+        try:
+            excel = win32.gencache.EnsureDispatch('Excel.Application')
+        except Exception:
+            error("Excel Application Error",
+                  ("Could not open Excel application. "
+                   "Possible reasons:\n"
+                   "- Excel is not installed on your machine\n"
+                   "- Excel is already running. Please close all excel workbooks before running the stamper"))
+
+        for i, excel_document_path in enumerate(documents):
+            if self.gui.is_stopped():
+                self.gui.reset_progress()
+                return
+            workbook = excel.Workbooks.Open(excel_document_path)
+            sheet_name = [sh for sh in workbook.Sheets][0].Name
+            worksheet = workbook.Worksheets(sheet_name)
+            try:
+                worksheet.Pictures(Invoice.STAMP_PICTURE_NAME).Delete()
+                workbook.Save()
+                workbook.Close()
+            except Exception:
+                skipped_documents.append(excel_document_path)
+                workbook.Close()
+                continue
+            self.gui.progress_bar['value'] = (i+1.0)/len(documents)*100.0
+            succeeded += 1
+        skipped_total = len(documents) - succeeded
+        if skipped_total == 0:
+            info(title="OK", body=(
+                f"Successfully removed all stamps"))
+            return
+        failed_list = "\n".join([path.name for path in skipped_documents])
+        report = f"Failed to remove stamp from {skipped_total}/{len(documents)} Excel files. Files that failed:\n{failed_list}"
         warn(title="Skipped Some Documents", body=report)
 
     def generate_pdf(self):
@@ -107,7 +153,8 @@ class StampBot:
                 return None
         for i, excel_document_path in enumerate(documents):
             if self.gui.is_stopped():
-                break
+                self.gui.reset_progress()
+                return
             try:
                 generate_pdf(excel, excel_document_path, out_dir)
             except:

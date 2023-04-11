@@ -45,6 +45,7 @@ def get_invoices_data(csv_path):
 
 
 class Invoice:
+    STAMP_PICTURE_NAME = "stampqr87473828"
     header_expected = ['company', 'vat num',
                        'date', 'vat', 'total', 'inv', 'qr']
 
@@ -69,8 +70,14 @@ class Invoice:
             raise OpenInvoiceError
         sheet_name = [sh.Name for sh in wb.Sheets][0]  # could raise IndexError
         ws = wb.Worksheets(sheet_name)
+        try:
+            ws.Pictures(self.STAMP_PICTURE_NAME).Delete()
+        except:
+            pass
+
         cell = ws.Range(self.qr_cell)
         picture = ws.Pictures().Insert(tmp_img_path)
+        picture.Name = self.STAMP_PICTURE_NAME
         cell_width = cell.Width
         aspect = picture.Width / picture.Height
         picture_width = cell_width * scale

@@ -17,11 +17,12 @@ BG_COLOR = '#fafafa'
 
 
 class GUI:
+
     def __init__(self) -> None:
         dir_path = Path(os.path.dirname(os.path.realpath(__file__)))
         self.assets_dir = dir_path / "assets"
 
-        # create tooy
+        # create root
         self.root = ThemedTk(theme="adapta")
         self.root.geometry('{}x{}'.format(WIDTH, HEGIHT))
         self.root.title("QR Stamp Tool")
@@ -56,21 +57,25 @@ class GUI:
         self.generate_pdf_btn = tk.ttk.Button(self.buttons_frame, text="Generate PDF",
                                               command=self.generate_pdf, width=20)
         self.generate_pdf_btn.grid(column=1, row=0, padx=10, pady=10)
-        # scale
-        self.scale_label = tk.ttk.Label(scale_frame, text="scale stamp:")
-        self.scale_label.grid(column=0, row=0)
-        self.scale = tk.ttk.Scale(
-            scale_frame, from_=0.05, to=2.0, length=300, command=self.update_scale_value)
-        self.scale.set(0.5)
-        self.scale.grid(column=1, row=0, padx=10)
-        self.scale_value = tk.ttk.Label(scale_frame)
-        self.update_scale_value(self.scale.get())
-        self.scale_value.grid(column=2, row=0)
+        # undo
+        self.undo_btn = tk.ttk.Button(
+            self.buttons_frame, text="Clear All", command=self.undo)
+        self.undo_btn.grid(column=2, row=0, padx=10, pady=10)
         # Stop button
         stop_icon = tk.PhotoImage(file=str(self.assets_dir / "pause.png"))
         self.stop_btn = tk.ttk.Button(
             self.buttons_frame, image=stop_icon, command=self.stop)
-        self.stop_btn.grid(column=2, row=0, padx=10, pady=10)
+        self.stop_btn.grid(column=3, row=0, padx=10, pady=10)
+        # scale
+        self.scale_label = tk.ttk.Label(scale_frame, text="scale stamp:")
+        self.scale_label.grid(column=0, row=0)
+        self.scale_value = tk.ttk.Label(scale_frame)
+        self.scale_value.grid(column=2, row=0)
+        self.scale = tk.ttk.Scale(
+            scale_frame, from_=0.05, to=2.0, length=300, command=self.update_scale_value)
+        self.scale.set(0.5)
+        self.scale.grid(column=1, row=0, padx=10)
+        self.update_scale_value(self.scale.get())
         # progress bar
         self.progress_bar = tk.ttk.Progressbar(
             self.root, orient="horizontal", length=WIDTH, mode='determinate')
@@ -95,13 +100,15 @@ class GUI:
 
     def stamp(self):
         self.reset_progress()
-        t1 = threading.Thread(target=self.bot.stamp_all)
-        t1.start()
+        threading.Thread(target=self.bot.stamp_all).start()
 
     def generate_pdf(self):
         self.reset_progress()
-        t1 = threading.Thread(target=self.bot.generate_pdf)
-        t1.start()
+        threading.Thread(target=self.bot.generate_pdf).start()
+
+    def undo(self):
+        self.reset_progress()
+        threading.Thread(target=self.bot.undo).start()
 
     def stop(self):
         self.stop_pressed = True
