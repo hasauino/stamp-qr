@@ -12,7 +12,7 @@ from qr_stamp.stampper import StampBot
 
 PREVIEW_ASPECT_RATIO = 1.4142
 WIDTH = 560
-HEGIHT = 270
+HEGIHT = 310
 BG_COLOR = '#fafafa'
 
 
@@ -35,9 +35,12 @@ class GUI:
         # config csv file chooser
         self.config_chooser_frame = tk.ttk.Frame(self.root)
         self.config_chooser_frame.grid(column=0, row=1, padx=10, pady=20)
+        # scale
+        scale_frame = tk.ttk.Frame(self.root)
+        scale_frame.grid(column=0, row=2, padx=10, pady=10)
         # buttons
         self.buttons_frame = tk.ttk.Frame(self.root)
-        self.buttons_frame.grid(column=0, row=2, padx=10)
+        self.buttons_frame.grid(column=0, row=3, padx=10)
 
         # populate frames
         self.excel_dir_chooser = PathChooser(frame=self.dir_chooser_frame,
@@ -53,6 +56,16 @@ class GUI:
         self.generate_pdf_btn = tk.ttk.Button(self.buttons_frame, text="Generate PDF",
                                               command=self.generate_pdf, width=20)
         self.generate_pdf_btn.grid(column=1, row=0, padx=10, pady=10)
+        # scale
+        self.scale_label = tk.ttk.Label(scale_frame, text="scale stamp:")
+        self.scale_label.grid(column=0, row=0)
+        self.scale = tk.ttk.Scale(
+            scale_frame, from_=0.05, to=2.0, length=300, command=self.update_scale_value)
+        self.scale.set(0.5)
+        self.scale.grid(column=1, row=0, padx=10)
+        self.scale_value = tk.ttk.Label(scale_frame)
+        self.update_scale_value(self.scale.get())
+        self.scale_value.grid(column=2, row=0)
         # Stop button
         stop_icon = tk.PhotoImage(file=str(self.assets_dir / "pause.png"))
         self.stop_btn = tk.ttk.Button(
@@ -87,7 +100,7 @@ class GUI:
 
     def generate_pdf(self):
         self.reset_progress()
-        t1 = threading.Thread(target=self.bot.stamp_all)
+        t1 = threading.Thread(target=self.bot.generate_pdf)
         t1.start()
 
     def stop(self):
@@ -101,6 +114,9 @@ class GUI:
 
     def reset_progress(self):
         self.progress_bar["value"] = 0
+
+    def update_scale_value(self, val):
+        self.scale_value.config(text="{:.1f} x cell width".format(float(val)))
 
 
 class PathChooser:

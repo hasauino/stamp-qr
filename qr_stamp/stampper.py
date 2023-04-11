@@ -7,7 +7,7 @@ import win32com.client as win32
 from qr_stamp.exceptions import EncodingError, QRGenerationError, OpenInvoiceError
 from qr_stamp.invoice import Invoice, get_invoices_data
 from qr_stamp.msgs import error, generate_report, info, warn
-from qr_stamp.utils import get_file_name
+from qr_stamp.utils import get_file_name, generate_pdf
 
 
 class StampBot:
@@ -61,7 +61,7 @@ class StampBot:
                 skipped_documents["encoding_error"].append(excel_document_path)
                 continue
             try:
-                invoice.insert_to_excel_file(excel, excel_document_path)
+                invoice.insert_to_excel_file(excel, excel_document_path, self.gui.scale.get())
             except QRGenerationError:
                 skipped_documents["qr_generation_error"].append(
                     excel_document_path)
@@ -78,6 +78,52 @@ class StampBot:
             return
         report = generate_report(
             skipped_documents, skipped_total, len(documents))
+        warn(title="Skipped Some Documents", body=report)
+
+    def generate_pdf(self):
+        self.gui.stop_reset()
+        dir_path = self.gui.excel_dir_chooser.get()
+        succeeded = 0
+        skipped_documents = []
+        self.gui.progress_bar['value'] = 5
+        documents = self.check_directory(dir_path)
+        if documents is None:
+            return None
+        try:
+            excel = win32.gencache.EnsureDispatch('Excel.Application')
+        except Exception:
+            error("Excel Application Error",
+                  ("Could not open Excel application. "
+                   "Possible reasons:\n"
+                   "- Excel is not installed on your machine\n"
+                   "- Excel is already running. Please close all excel workbooks before running the stamper"))
+        out_dir = Path(documents[0]).parent / "out"
+        if not out_dir.exists():
+            try:
+                os.mkdir(out_dir)
+            except:
+                error(title="Output Directory Error",
+                      body="Could not create output directory")
+                return None
+        for i, excel_document_path in enumerate(documents):
+            if self.gui.is_stopped():
+                break
+            try:
+                generate_pdf(excel, excel_document_path, out_dir)
+            except:
+                skipped_documents.append(excel_document_path)
+                continue
+
+            self.gui.progress_bar['value'] = (i+1.0)/len(documents)*100.0
+            succeeded += 1
+        skipped_total = len(documents) - succeeded
+        if skipped_total == 0:
+            info(title="Done", body=(
+                f"Successfully generated all PDF files to:\n {Path(excel_document_path).parent}"))
+            return
+        failed_list = "\n".join([path.name for path in skipped_documents])
+        report = f"Failed to export {skipped_total}/{len(documents)} of Excel files to PDF. Files that failed:\n{failed_list}"
+
         warn(title="Skipped Some Documents", body=report)
 
     def is_valid_invoice(self, document_abs_path):

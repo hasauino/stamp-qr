@@ -57,7 +57,7 @@ class Invoice:
         except Exception:
             raise EncodingError
 
-    def insert_to_excel_file(self, excel, abs_path):
+    def insert_to_excel_file(self, excel, abs_path, scale):
         # generate image and save it to a tmp path
         tmp_dir = tempfile.gettempdir()
         tmp_img_path = Path(tmp_dir) / "stamp.png"
@@ -73,7 +73,7 @@ class Invoice:
         picture = ws.Pictures().Insert(tmp_img_path)
         cell_width = cell.Width
         aspect = picture.Width / picture.Height
-        picture_width = cell_width / 2
+        picture_width = cell_width * scale
         picture_height = int(picture_width/aspect)
         picture.Width = picture_width
         picture.Height = picture_height
